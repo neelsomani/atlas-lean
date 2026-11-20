@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from scripts import check_graph_rules as rules
 
@@ -19,10 +21,11 @@ TAXONOMY = {
     },
     "placements": {},
 }
+PLANNED = {rules.AUTOFORM: {rules.NOT_READY: True}}
 
 
 class Vault:
-    """A small vault: roadmap/CategoryTheory/topos-theory with two articles, and Physics with one."""
+    """A small vault: CategoryTheory/topos-theory with two linked articles, and Physics with one planned node."""
 
     def __init__(self, root: Path) -> None:
         self.root = root
@@ -48,10 +51,7 @@ class Vault:
                 self.row("CategoryTheory/topos-theory/is-topos.md", declaration="X.IsTopos", id="af_" + "1" * 24),
                 self.row("CategoryTheory/topos-theory/fundamental.md", declaration="X.fundamental"),
             ],
-            "Physics": [
-                self.row("Physics/README.md"),
-                self.row("Physics/mechanics.md", extensions={rules.AUTOFORM: {rules.NOT_READY: True}}),
-            ],
+            "Physics": [self.row("Physics/README.md"), self.row("Physics/mechanics.md", extensions=PLANNED)],
         }
         self.save()
 
@@ -75,8 +75,8 @@ class Vault:
         for name, rows in self.annotations.items():
             self.write(f"blueprint/links/{name}.jsonl", "".join(json.dumps(row) + "\n" for row in rows))
 
-    def check(self, base: str | None = None) -> list[str]:
-        return rules.check(self.root, base)
+    def check(self) -> list[str]:
+        return [str(finding) for finding in rules.check(self.root)]
 
 
 class GraphRules(unittest.TestCase):
@@ -87,12 +87,13 @@ class GraphRules(unittest.TestCase):
     def tearDown(self) -> None:
         self.tmp.cleanup()
 
-    def assertFinds(self, fragment: str) -> None:
-        errors = self.vault.check()
-        self.assertTrue(any(fragment in error for error in errors), errors)
+    def findings(self) -> str:
+        return "\n".join(self.vault.check())
 
     def test_a_well_formed_vault_passes(self) -> None:
         self.assertEqual(self.vault.check(), [])
+
+    # Rule 5
 
     def test_annotations_name_existing_pages_once_in_their_subjects_file(self) -> None:
         self.vault.annotations["Physics"].append(Vault.row("Physics/gone.md"))
@@ -100,93 +101,133 @@ class GraphRules(unittest.TestCase):
         self.vault.annotations["Physics"].append(Vault.row("CategoryTheory/topos-theory/README.md"))
         self.vault.annotations["Physics"].append({"subject": []})
         self.vault.save()
-        errors = "\n".join(self.vault.check())
-        self.assertIn("'../roadmap/Physics/gone.md' does not exist", errors)
-        self.assertIn("Physics/mechanics.md is already annotated", errors)
-        self.assertIn("belongs in blueprint/links/CategoryTheory.jsonl", errors)
-        self.assertIn("exactly one subject page", errors)
+        found = self.findings()
+        self.assertIn("Physics.jsonl:3: its annotation names a page that does not exist (rule 5)", found)
+        self.assertIn("Physics.jsonl:4: the page has more than one annotation (rule 5)", found)
+        self.assertIn("its annotation belongs in blueprint/links/CategoryTheory.jsonl", found)
+        self.assertIn("a row names exactly one subject page", found)
 
-    def test_article_ids_are_well_formed_and_unique(self) -> None:
+    def test_ids_are_well_formed_and_unique_and_a_missing_one_is_fine(self) -> None:
         self.vault.annotations["Physics"][1]["id"] = "af_" + "1" * 24
         self.vault.annotations["CategoryTheory"][0]["id"] = "af_xyz"
         self.vault.save()
-        errors = "\n".join(self.vault.check())
-        self.assertIn("is already used", errors)
-        self.assertIn("malformed article id 'af_xyz'", errors)
+        found = self.findings()
+        self.assertIn("is also blueprint/roadmap/CategoryTheory/topos-theory/is-topos.md's", found)
+        self.assertIn("malformed id 'af_xyz'", found)
+        self.assertNotIn("fundamental.md", found)  # it has no id, which is not a finding (#5524)
 
     def test_an_annotation_names_at_most_one_declaration(self) -> None:
         self.vault.annotations["CategoryTheory"][2]["object"].append({"location": {"declaration": "X.other"}})
         self.vault.save()
-        self.assertFinds("at most one Lean declaration")
+        self.assertIn("names more than one Lean declaration", self.findings())
+
+    # Rule 8
+
+    def test_facts_lean_facts_adds_are_never_committed(self) -> None:
+        self.vault.annotations["CategoryTheory"][2]["kind"] = "def"
+        self.vault.annotations["CategoryTheory"][3]["status"] = "stated"
+        self.vault.save()
+        found = self.findings()
+        self.assertIn("commits 'kind', which lean-facts adds at build time (rule 8)", found)
+        self.assertIn("commits 'status'", found)
+
+    # Rule 12
 
     def test_a_node_to_break_down_is_a_planned_article_marked_not_ready(self) -> None:
-        marker = {rules.AUTOFORM: {rules.NOT_READY: True}}
-        self.vault.annotations["CategoryTheory"][2]["extensions"] = marker  # names a declaration
-        self.vault.annotations["CategoryTheory"][1]["extensions"] = marker  # a folder page
+        self.vault.annotations["CategoryTheory"][2]["extensions"] = PLANNED  # names a declaration
+        self.vault.annotations["CategoryTheory"][1]["extensions"] = PLANNED  # a folder page
         self.vault.annotations["Physics"][1]["extensions"] = {rules.AUTOFORM: {rules.NOT_READY: "yes"}}
         self.vault.save()
-        errors = "\n".join(self.vault.check())
-        self.assertIn("a node still to be broken down (not_ready) names no Lean declaration", errors)
-        self.assertIn("a folder page is not a node to break down", errors)
-        self.assertIn("takes true or false; Autoform drops any other value", errors)
+        found = self.findings()
+        self.assertIn("a node still to be broken down (not_ready) names no Lean declaration", found)
+        self.assertIn("a folder page is not a node to break down", found)
+        self.assertIn("takes true or false; Autoform drops any other value", found)
 
     def test_not_ready_false_and_legacy_rows(self) -> None:
         self.vault.annotations["Physics"][1]["extensions"] = {rules.AUTOFORM: {rules.NOT_READY: False}}
         # A row an earlier sync wrote with only a module and a name counts as linked, as lean-facts reads it.
-        legacy = {rules.OWN: {"module": "X.Mod", "name": "far"}, rules.AUTOFORM: {rules.NOT_READY: True}}
         self.vault.annotations["CategoryTheory"][3].pop("object")
-        self.vault.annotations["CategoryTheory"][3]["extensions"] = legacy
+        self.vault.annotations["CategoryTheory"][3]["extensions"] = {rules.OWN: {"module": "X.Mod", "name": "far"}, **PLANNED}
         self.vault.save()
         errors = self.vault.check()
         self.assertEqual(len(errors), 1, errors)
         self.assertIn("names no Lean declaration", errors[0])
 
+    # Rule 1
+
     def test_folders_follow_the_taxonomy(self) -> None:
         self.vault.write("blueprint/roadmap/Alchemy/README.md", "# Alchemy\n")
         self.vault.write("blueprint/roadmap/CategoryTheory/sheaves/README.md", "# Sheaves\n")
         self.vault.write("blueprint/roadmap/CategoryTheory/loose.md", "# Loose\n")
-        errors = "\n".join(self.vault.check())
-        self.assertIn("Alchemy/: not a subject", errors)
-        self.assertIn("CategoryTheory/sheaves/: not a field of CategoryTheory", errors)
-        self.assertIn("CategoryTheory/loose.md: a page of a subject with fields goes in a field folder", errors)
+        found = self.findings()
+        self.assertIn("Alchemy: not a subject", found)
+        self.assertIn("CategoryTheory/sheaves: not a field of CategoryTheory", found)
+        self.assertIn("CategoryTheory/loose.md: a page of a subject with fields goes in a field folder", found)
 
-    def test_unclassified_modules_and_subjects_without_fields_take_any_folder(self) -> None:
+    def test_the_generators_unclassified_folders_and_subjects_without_fields_take_any_folder(self) -> None:
         self.vault.write("blueprint/roadmap/README.md", "# ATLAS roadmap\n\n- [Category Theory](CategoryTheory/README.md)\n"
                          "- [Physics](Physics/README.md)\n- [Not yet classified](not-yet-classified/README.md)\n")
         self.vault.write("blueprint/roadmap/not-yet-classified/README.md", "# Not yet classified\n")
+        # generate_wiki.py puts a subject's unplaced modules in a field folder of this name.
+        self.vault.write("blueprint/roadmap/CategoryTheory/README.md", "# Category Theory\n\n- [Topos theory](topos-theory/README.md)\n"
+                         "- [Not yet classified](not-yet-classified/README.md)\n")
+        self.vault.write("blueprint/roadmap/CategoryTheory/not-yet-classified/README.md", "# Not yet classified\n")
         self.vault.write("blueprint/roadmap/Physics/README.md", "# Physics\n\n- [Mechanics](mechanics.md)\n- [Optics](optics/README.md)\n")
         self.vault.write("blueprint/roadmap/Physics/optics/README.md", "# Optics\n")
+        self.vault.annotations["not-yet-classified"] = [Vault.row("not-yet-classified/README.md")]
+        self.vault.annotations["Physics"].append(Vault.row("Physics/optics/README.md"))
+        self.vault.annotations["CategoryTheory"].append(Vault.row("CategoryTheory/not-yet-classified/README.md"))
+        self.vault.save()
         self.assertEqual(self.vault.check(), [])
+
+    # Rule 2
 
     def test_every_page_and_folder_is_listed_on_its_folder_page(self) -> None:
         self.vault.write("blueprint/roadmap/Physics/README.md", "# Physics\n")
         self.vault.write("blueprint/roadmap/CategoryTheory/README.md", "# Category Theory\n")
-        errors = "\n".join(self.vault.check())
-        self.assertIn("Physics/mechanics.md: not listed on Physics/README.md", errors)
-        self.assertIn("CategoryTheory/topos-theory: not listed on CategoryTheory/README.md", errors)
+        found = self.findings()
+        self.assertIn("Physics/mechanics.md: not listed on blueprint/roadmap/Physics/README.md", found)
+        self.assertIn("CategoryTheory/topos-theory/README.md: not listed on", found)
+
+    def test_listings_are_read_as_autoform_reads_links(self) -> None:
+        readme = "blueprint/roadmap/Physics/README.md"
+        for text in ("# Physics\n\n- [Mechanics][m]\n\n[m]: mechanics.md\n", "# Physics\n\n- [Mechanics](%6dechanics.md)\n"):
+            self.vault.write(readme, text)
+            self.assertEqual(self.vault.check(), [], text)
+        for text in ("# Physics\n\n```markdown\n- [Mechanics](mechanics.md)\n```\n",
+                     "# Physics\n\n<!-- - [Mechanics](mechanics.md) -->\n"):
+            self.vault.write(readme, text)
+            self.assertIn("Physics/mechanics.md: not listed", self.findings(), text)
 
     def test_a_folder_needs_its_folder_page(self) -> None:
         (self.vault.root / "blueprint/roadmap/Physics/README.md").unlink()
         self.vault.annotations["Physics"].pop(0)
         self.vault.save()
-        self.assertFinds("Physics/: has no README.md folder page")
+        self.assertIn("blueprint/roadmap/Physics: the folder has no README.md folder page", self.findings())
 
-    def test_lean_sections_are_never_committed_on_declared_pages(self) -> None:
+    # Rules 9 and 10
+
+    def test_lean_sections_are_never_committed_on_linked_pages(self) -> None:
         # Physics/mechanics.md is a planned page: it may write its own prerequisites (rule 10).
         self.vault.write("blueprint/roadmap/Physics/mechanics.md",
                          "# Mechanics\n\nNewton.\n\n## Depends on\n\n- [Topos](../CategoryTheory/topos-theory/is-topos.md)\n")
-        # Autoform reads headings case-folded and reference links, so the check does too; fenced code is not read.
+        # Headings are read case-folded, an empty section counts, and fenced code is not read.
         self.vault.write(
             "blueprint/roadmap/CategoryTheory/topos-theory/fundamental.md",
             "# Fundamental theorem\n\nSlices.\n\n## proof depends on\n\n- [Elementary topos][t]\n\n[t]: is-topos.md\n",
         )
         self.vault.write(
             "blueprint/roadmap/CategoryTheory/topos-theory/is-topos.md",
-            "# Elementary topos\n\nA topos.\n\n```markdown\n## Depends on\n\n- [x](fundamental.md)\n```\n",
+            "# Elementary topos\n\nA topos.\n\n## Depends on\n\nThis node has no prerequisites.\n\n"
+            "```markdown\n## Proof depends on\n```\n",
         )
         errors = self.vault.check()
-        self.assertEqual(len(errors), 1, errors)
-        self.assertIn("topos-theory/fundamental.md: commits `## Depends on` or `## Proof depends on`", errors[0])
+        self.assertEqual(len(errors), 2, errors)
+        self.assertTrue(all("which lean-facts writes at build time (rule 9)" in error for error in errors), errors)
+        self.assertIn("topos-theory/fundamental.md: commits `## proof depends on`", errors[0])
+        self.assertIn("topos-theory/is-topos.md: commits `## Depends on`", errors[1])
+
+    # Rule 11
 
     def test_informal_edges_link_pages_and_close_no_cycle(self) -> None:
         self.vault.write(
@@ -194,18 +235,31 @@ class GraphRules(unittest.TestCase):
             "# Elementary topos\n\nA topos.\n\n## INFORMALLY USES\n\n- [Fundamental](fundamental.md)\n"
             "- [Missing](missing.md)\n- [Itself](is-topos.md)\n",
         )
-        errors = "\n".join(self.vault.check())
-        self.assertIn("closes a cycle: CategoryTheory/topos-theory/fundamental -> CategoryTheory/topos-theory/is-topos", errors)
-        self.assertIn("informal target does not exist: 'missing.md'", errors)
-        self.assertIn("informally uses itself", errors)
+        found = self.findings()
+        self.assertIn("these pages reach each other through `## Informally uses`: "
+                      "blueprint/roadmap/CategoryTheory/topos-theory/fundamental.md, "
+                      "blueprint/roadmap/CategoryTheory/topos-theory/is-topos.md", found)
+        self.assertIn("informal target does not exist: 'missing.md'", found)
+        self.assertIn("informally uses itself", found)
+
+    def test_a_cycle_through_counted_and_informal_edges_is_found(self) -> None:
+        # Fundamental -> Topos -> Mechanics informally, then Mechanics -> Fundamental through the planned page's own
+        # `## Depends on`: no informal-only cycle, but a cycle all the same.
+        self.vault.write(
+            "blueprint/roadmap/CategoryTheory/topos-theory/is-topos.md",
+            "# Elementary topos\n\nA topos.\n\n## Informally uses\n\n- [Mechanics](../../Physics/mechanics.md)\n",
+        )
+        self.vault.write("blueprint/roadmap/Physics/mechanics.md",
+                         "# Mechanics\n\nNewton.\n\n## Depends on\n\n- [Fundamental](../CategoryTheory/topos-theory/fundamental.md)\n")
+        self.assertIn("reach each other through `## Informally uses`", self.findings())
+
+    def test_a_cycle_of_counted_edges_alone_is_left_to_autoform(self) -> None:
+        groups = rules.strongly_connected({"a": {"b"}, "b": {"c"}, "c": {"a"}, "d": {"a"}})
+        self.assertEqual(groups, [["a", "b", "c"]])
 
     def test_a_graph_autoform_cannot_load_is_reported(self) -> None:
         self.vault.write("blueprint/roadmap/Physics/mechanics.md", "No title.\n")
-        self.assertFinds("autoform cannot load the graph")
-
-    def test_longer_informal_cycles_are_found_once(self) -> None:
-        cycle = {name: [target] for name, target in (("a", "b"), ("b", "c"), ("c", "a"), ("d", "a"))}
-        self.assertEqual(rules.informal_cycles(cycle), [["a", "b", "c", "a"]])
+        self.assertIn("autoform cannot load the graph", self.findings())
 
 
 class GitRules(unittest.TestCase):
@@ -214,9 +268,8 @@ class GitRules(unittest.TestCase):
         self.root = Path(self.tmp.name)
         self.vault = Vault(self.root)
         self.git("init", "-q")
-        self.git("add", "-A")
-        self.git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "base")
-        self.base = self.git("rev-parse", "HEAD").strip()
+        self.commit()
+        self.base = self.head()
 
     def tearDown(self) -> None:
         self.tmp.cleanup()
@@ -226,61 +279,100 @@ class GitRules(unittest.TestCase):
 
     def commit(self) -> None:
         self.git("add", "-A")
-        self.git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "change")
+        self.git("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "change", "--allow-empty")
+
+    def head(self) -> str:
+        return self.git("rev-parse", "HEAD").strip()
+
+    def run_main(self, *args: str) -> int:
+        with patch.dict(os.environ, {"GITHUB_ACTIONS": ""}):
+            return rules.main(["--root", str(self.root), *args])
 
     def test_build_outputs_are_never_committed(self) -> None:
         self.vault.write("site/index.html", "<html></html>")
         self.vault.write("v2-modules.txt", "MathlibExt\n")
         self.vault.write("blueprint/site/keep.txt", "not a build output\n")
         self.commit()
-        errors = "\n".join(rules.check(self.root))
-        self.assertIn("site/index.html: a build output is committed", errors)
-        self.assertIn("v2-modules.txt: a build output is committed", errors)
-        self.assertNotIn("blueprint/site", errors)
+        found = "\n".join(str(finding) for finding in rules.check(self.root))
+        self.assertIn("site/index.html: a build output is committed (rule 8)", found)
+        self.assertIn("v2-modules.txt: a build output is committed", found)
+        self.assertNotIn("blueprint/site", found)
 
     def test_a_pr_changes_fewer_files_than_github_shows(self) -> None:
         self.assertEqual(rules.check(self.root, self.base), [])
-        original = rules.MAX_CHANGED_FILES
-        rules.MAX_CHANGED_FILES = 3
-        try:
+        with patch.object(rules, "MAX_CHANGED_FILES", 3):
             for number in range(3):
                 self.vault.write(f"notes/{number}.txt", "x\n")
             self.commit()
-            errors = rules.check(self.root, self.base)
-        finally:
-            rules.MAX_CHANGED_FILES = original
-        self.assertEqual(len(errors), 1, errors)
-        self.assertIn("the PR changes 3 files", errors[0])
+            errors = [str(finding) for finding in rules.check(self.root, self.base)]
+        self.assertEqual(errors, ["the PR: changes 3 files; split it below 3, the most GitHub shows in one diff (rule 15)"])
 
-    def test_a_pr_fails_only_on_findings_its_base_does_not_have(self) -> None:
-        self.assertEqual(rules.main(["--root", str(self.root), "--base", self.base]), 0)
-        # The base already lists nothing on Physics/README.md: that finding warns, it doesn't block.
+    def test_report_only_by_default_and_blocking_on_new_findings(self) -> None:
+        self.assertEqual(self.run_main("--base", self.base, "--blocking"), 0)
         self.vault.write("blueprint/roadmap/Physics/README.md", "# Physics\n")
         self.commit()
-        broken = self.git("rev-parse", "HEAD").strip()
-        self.assertEqual(rules.main(["--root", str(self.root), "--base", self.base]), 1)
-        self.assertEqual(rules.main(["--root", str(self.root), "--base", broken]), 0)
+        broken = self.head()
+        self.assertEqual(self.run_main("--base", self.base), 0)  # report-only
+        self.assertEqual(self.run_main("--base", self.base, "--blocking"), 1)
+        self.assertEqual(self.run_main("--base", broken, "--blocking"), 0)  # inherited
         self.vault.write("blueprint/roadmap/CategoryTheory/README.md", "# Category Theory\n")
         self.commit()
-        self.assertEqual(rules.main(["--root", str(self.root), "--base", broken]), 1)
+        self.assertEqual(self.run_main("--base", broken, "--blocking"), 1)
+        self.assertEqual(self.run_main("--blocking"), 1)  # with no base, every finding is new
 
     def test_a_row_inserted_above_an_old_finding_does_not_make_it_new(self) -> None:
-        # The base has a duplicate annotation on line 3 of Physics.jsonl.
-        self.vault.annotations["Physics"].append(Vault.row("Physics/mechanics.md"))
+        self.vault.annotations["Physics"].append(Vault.row("Physics/mechanics.md"))  # a duplicate, on line 3
         self.vault.save()
         self.commit()
-        broken = self.git("rev-parse", "HEAD").strip()
-        # The PR adds a page and its row at the top of the file: the duplicate is now on line 4.
+        broken = self.head()
         self.vault.write("blueprint/roadmap/Physics/optics.md", "# Optics\n\nLight.\n")
         self.vault.write("blueprint/roadmap/Physics/README.md", "# Physics\n\n- [Optics](optics.md)\n- [Mechanics](mechanics.md)\n")
-        self.vault.annotations["Physics"].insert(0, Vault.row("Physics/optics.md"))
+        self.vault.annotations["Physics"].insert(0, Vault.row("Physics/optics.md"))  # the duplicate is now line 4
         self.vault.save()
         self.commit()
-        self.assertEqual(rules.main(["--root", str(self.root), "--base", broken]), 0)
+        self.assertEqual(self.run_main("--base", broken, "--blocking"), 0)
 
-    def test_without_a_base_findings_are_reported_only(self) -> None:
+    def test_a_new_copy_of_an_old_mistake_and_a_moved_one_are_new(self) -> None:
+        self.vault.annotations["CategoryTheory"][2]["id"] = "af_bad"
+        self.vault.save()
+        self.commit()
+        broken = self.head()
+        # The mistake moves to another page: fixed on one, new on the other.
+        self.vault.annotations["CategoryTheory"][2]["id"] = "af_" + "1" * 24
+        self.vault.annotations["CategoryTheory"][3]["id"] = "af_bad"
+        self.vault.save()
+        self.commit()
+        self.assertEqual(self.run_main("--base", broken, "--blocking"), 1)
+        # A third annotation on a page that already has two: one more of the same finding.
+        self.git("reset", "-q", "--hard", broken)
+        self.vault.annotations["Physics"] += [Vault.row("Physics/mechanics.md")]
+        self.vault.save()
+        self.commit()
+        twice = self.head()
+        self.vault.annotations["Physics"] += [Vault.row("Physics/mechanics.md")]
+        self.vault.save()
+        self.commit()
+        self.assertEqual(self.run_main("--base", twice, "--blocking"), 1)
+
+    def test_build_outputs_the_base_already_tracks_are_inherited(self) -> None:
+        self.vault.write("site/index.html", "<html></html>")
+        self.commit()
+        with_site = self.head()
+        self.vault.write("note.txt", "unrelated\n")
+        self.commit()
+        self.assertEqual(self.run_main("--base", with_site, "--blocking"), 0)
+
+    def test_the_summary_and_annotations(self) -> None:
         self.vault.write("blueprint/roadmap/Physics/README.md", "# Physics\n")
-        self.assertEqual(rules.main(["--root", str(self.root)]), 0)
+        self.commit()
+        summary = self.root / "summary.md"
+        with patch.dict(os.environ, {"GITHUB_ACTIONS": "true"}), patch("sys.stderr") as stderr:
+            rules.main(["--root", str(self.root), "--base", self.base, "--summary", str(summary)])
+        written = "".join(call.args[0] for call in stderr.write.call_args_list)
+        self.assertIn("::warning file=blueprint/roadmap/Physics/mechanics.md,title=Graph rule 2::", written)
+        text = summary.read_text()
+        self.assertIn("## Graph rules (report-only)", text)
+        self.assertIn("| 2 | 1 | 0 |", text)
 
 
 if __name__ == "__main__":

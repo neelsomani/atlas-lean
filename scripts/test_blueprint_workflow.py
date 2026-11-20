@@ -214,7 +214,13 @@ class BlueprintWorkflowTests(unittest.TestCase):
     def test_the_graph_rules_run_early_and_compare_with_the_merge_commits_first_parent(self):
         step = self.step("Check the graph's rules")
         self.assertIn('git fetch --no-tags --depth=2 origin "$GITHUB_SHA"', step["run"])
-        self.assertIn('--base "$(git rev-parse HEAD^1)"', step["run"])
+        self.assertIn('args+=(--base "$(git rev-parse HEAD^1)")', step["run"])
+        self.assertIn('--summary "$GITHUB_STEP_SUMMARY"', step["run"])
+        # Report-only until a maintainer turns blocking on, and blocking only ever compares with a base.
+        self.assertEqual(step["env"]["BLOCKING"], "${{ vars.GRAPH_RULES_BLOCKING }}")
+        self.assertIn('if [ "${BLOCKING:-}" = true ]; then', step["run"])
+        self.assertLess(step["run"].index("--base"), step["run"].index("--blocking"))
+        self.assertNotIn("continue-on-error", step)
         self.assertNotIn("${{ github.event.pull_request.base.sha", self.text)
         positions = {s.get("name"): i for i, s in enumerate(self.steps)}
         self.assertLess(positions["Test the wiki scripts"], positions[step["name"]])
@@ -231,6 +237,8 @@ class BlueprintWorkflowTests(unittest.TestCase):
         self.assertIn("json.load", audit["run"])
         self.assertIn("autoform audit blueprint --lean-root . --json", audit["run"])
         self.assertIn("GITHUB_STEP_SUMMARY", audit["run"])
+        self.assertIn('for kind in ("findings", "warnings")', audit["run"])
+        self.assertIn("build/audit.json", self.step("Keep dependency diagnostics")["with"]["path"])
         positions = {s.get("name"): i for i, s in enumerate(self.steps)}
         self.assertLess(positions["Validate the theorem DAG and its declarations"], positions[audit["name"]])
         self.assertLess(positions[audit["name"]], positions["Render the blueprint"])
