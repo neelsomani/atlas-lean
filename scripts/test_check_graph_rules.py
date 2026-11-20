@@ -174,6 +174,14 @@ class GraphRules(unittest.TestCase):
         self.assertEqual(self.vault.check(), ["blueprint/links/linked.json: a symbolic link in blueprint/links/; "
                                               "Autoform does not follow it and render refuses it (rule 5)"])
 
+    def test_a_symlinked_links_folder_is_a_finding_and_is_not_read(self) -> None:
+        links = self.vault.root / "blueprint/links"
+        links.rename(self.vault.root / "blueprint/saved-links")
+        links.symlink_to("saved-links")
+        found = self.findings()
+        self.assertIn("blueprint/links: not a folder (a symbolic link or missing), so Autoform reads no annotation", found)
+        self.assertNotIn("saved-links", found)
+
     def test_files_that_are_not_utf8_are_findings_not_crashes(self) -> None:
         links = self.vault.root / "blueprint/links/Physics.jsonl"
         links.write_bytes(links.read_bytes().replace(b"mechanics", b"m\xe9chanics"))

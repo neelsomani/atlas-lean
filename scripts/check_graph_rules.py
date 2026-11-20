@@ -209,6 +209,10 @@ def load_annotations(root: Path, report: Report) -> dict[Path, dict]:
     ids: dict[str, list[tuple[str, str]]] = {}
     annotations: dict[Path, dict] = {}
     symlinks: list[Path] = []
+    if links.is_symlink() or not links.is_dir():
+        # Autoform accepts only a real folder here ("blueprint/links is not a folder, so no annotation is read").
+        report.add(5, "blueprint/links", "not a folder (a symbolic link or missing), so Autoform reads no annotation")
+        return annotations
     files = links_files(links, symlinks)
     for link in symlinks:
         # Not followed, and named by its own path: Autoform leaves it out and render refuses it.
@@ -312,7 +316,7 @@ def check_taxonomy(root: Path, report: Report) -> None:
     roadmap = root / "blueprint" / "roadmap"
     try:
         subjects = json.loads((root / "scripts" / "taxonomy.json").read_text(encoding="utf-8"))["subjects"]
-    except (OSError, json.JSONDecodeError, KeyError, TypeError) as error:
+    except (OSError, UnicodeError, json.JSONDecodeError, KeyError, TypeError) as error:
         report.add(1, "scripts/taxonomy.json", f"unreadable taxonomy ({error})")
         return
     for folder in sorted(path for path in roadmap.iterdir() if path.is_dir()):
