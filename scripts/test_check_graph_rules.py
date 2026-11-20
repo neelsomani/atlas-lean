@@ -170,7 +170,18 @@ class GraphRules(unittest.TestCase):
         target = self.vault.root / "elsewhere.json"
         target.write_text(json.dumps(Vault.row("Physics/mechanics.md", kind="theorem")))
         (self.vault.root / "blueprint/links/linked.json").symlink_to(target)
-        self.assertEqual(self.vault.check(), [])  # Autoform skips dot-named folders and does not follow symlinks
+        # Autoform skips dot-named folders; it does not follow a symlink, and render refuses one.
+        self.assertEqual(self.vault.check(), ["blueprint/links/linked.json: a symbolic link in blueprint/links/; "
+                                              "Autoform does not follow it and render refuses it (rule 5)"])
+
+    def test_files_that_are_not_utf8_are_findings_not_crashes(self) -> None:
+        links = self.vault.root / "blueprint/links/Physics.jsonl"
+        links.write_bytes(links.read_bytes().replace(b"mechanics", b"m\xe9chanics"))
+        page = self.vault.root / "blueprint/roadmap/CategoryTheory/topos-theory/is-topos.md"
+        page.write_bytes(b"# Elementary topos\n\nA t\xf6pos.\n")
+        found = self.findings()
+        self.assertIn("blueprint/links/Physics.jsonl: not UTF-8", found)
+        self.assertIn("topos-theory/is-topos.md: not UTF-8", found)
 
     def test_a_second_row_for_a_page_is_checked_in_full(self) -> None:
         self.vault.annotations["CategoryTheory"].append(

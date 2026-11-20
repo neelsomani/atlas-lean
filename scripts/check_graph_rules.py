@@ -142,17 +142,30 @@ def linked(annotation: dict) -> bool:
 # --------------------------------------------------------------------------- annotations: rules 5, 8, 12
 
 
-def annotation_rows(source: Path) -> list[tuple[int | None, str]]:
+def read_text(path: Path, root: Path, report: Report, rule: int) -> str | None:
+    """A file's text, decoded strictly as UTF-8, or None with a finding when it cannot be read: Autoform leaves
+    out an annotation file that is not UTF-8 and reports a page it cannot read, and lean-facts stops on either."""
+    try:
+        return path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        report.add(rule, rel(path, root), "not UTF-8; Autoform leaves it out and lean-facts stops on it")
+    except OSError as error:
+        report.add(rule, rel(path, root), f"cannot be read ({error.strerror})")
+    return None
+
+
+def annotation_rows(text: str, source: Path) -> list[tuple[int | None, str]]:
     """The rows Autoform reads from a links file: one per line of a `.jsonl` or `.ndjson`, the whole of a `.json`."""
-    text = source.read_text(encoding="utf-8", errors="replace").replace("\r\n", "\n").replace("\r", "\n")
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
     if source.name.lower().endswith(ANNOTATION_LINES):
         return [(number, line) for number, line in enumerate(text.split("\n"), 1) if line.strip(" \t")]
     return [(None, text)]
 
 
-def links_files(links: Path) -> list[Path]:
+def links_files(links: Path, symlinks: list[Path] | None = None) -> list[Path]:
     """The files under blueprint/links/ the pinned Autoform reads (autoform_cli/annotations.py): no dot-named
-    file or folder, and no symbolic link, which Autoform does not follow."""
+    file or folder, and no symbolic link, which Autoform does not follow; those go in `symlinks`."""
+    symlinks = symlinks if symlinks is not None else []
     found: list[Path] = []
     pending = [links]
     while pending:
@@ -162,7 +175,10 @@ def links_files(links: Path) -> list[Path]:
         except OSError:
             continue
         for entry in entries:
-            if entry.name.startswith(".") or entry.is_symlink():
+            if entry.name.startswith("."):
+                continue
+            if entry.is_symlink():
+                symlinks.append(Path(entry.path))
                 continue
             if entry.is_dir(follow_symlinks=False):
                 pending.append(Path(entry.path))
@@ -192,17 +208,26 @@ def load_annotations(root: Path, report: Report) -> dict[Path, dict]:
     seen: dict[Path, str] = {}
     ids: dict[str, list[tuple[str, str]]] = {}
     annotations: dict[Path, dict] = {}
-    for source in links_files(links):
+    symlinks: list[Path] = []
+    files = links_files(links, symlinks)
+    for link in symlinks:
+        # Not followed, and named by its own path: Autoform leaves it out and render refuses it.
+        name = link.relative_to(root).as_posix()
+        report.add(5, name, "a symbolic link in blueprint/links/; Autoform does not follow it and render refuses it")
+    for source in files:
         name, lowered = rel(source, root), source.name.lower()
         if not lowered.endswith(ANNOTATION_SUFFIXES):
             continue
         top_level = source.parent == links
         if source.name == DEFAULTS:
             # Autoform merges every defaults file into the rows below it, so none may add derived facts.
+            text = read_text(source, root, report, 5)
+            if text is None:
+                continue
             try:
-                shared = json.loads(source.read_text(encoding="utf-8"))
-            except (UnicodeError, json.JSONDecodeError) as error:
-                report.add(5, name, f"not JSON ({error})")
+                shared = json.loads(text)
+            except json.JSONDecodeError as error:
+                report.add(5, name, f"not JSON ({error.msg})")
                 continue
             for fact in DERIVED_FACTS:
                 if isinstance(shared, dict) and fact in shared:
@@ -214,7 +239,10 @@ def load_annotations(root: Path, report: Report) -> dict[Path, dict]:
             # Autoform reads every .json, .jsonl and .ndjson file here, at any depth; sync_wiki.py reads only
             # blueprint/links/<Subject>.jsonl, so annotations anywhere else are a second, unsynced source.
             report.add(5, name, "Autoform reads this file, but annotations go in blueprint/links/<Subject>.jsonl")
-        for number, line in annotation_rows(source):
+        text = read_text(source, root, report, 5)
+        if text is None:
+            continue
+        for number, line in annotation_rows(text, source):
             at = name if number is None else f"{name}:{number}"
             try:
                 annotation = json.loads(line)
@@ -311,7 +339,8 @@ def check_listings(root: Path, report: Report) -> None:
         if not readme.is_file():
             report.add(2, rel(folder, root), "the folder has no README.md folder page")
             continue
-        listed = set(local_targets(readme, readme.read_text(encoding="utf-8")))
+        text = read_text(readme, root, report, 2)
+        listed = set(local_targets(readme, text)) if text is not None else set()
         for child in sorted(folder.iterdir()):
             entry = child / "README.md" if child.is_dir() else child
             if (child.is_dir() and entry.is_file()) or (child.suffix == ".md" and child.name != "README.md"):
@@ -327,7 +356,8 @@ def check_edges(root: Path, annotations: dict[Path, dict], report: Report) -> No
     vault = root / "blueprint"
     for page, annotation in sorted(annotations.items()):
         if linked(annotation) and page.name != "README.md":
-            for heading in lean_sections(page.read_text(encoding="utf-8")):
+            text = read_text(page, root, report, 9)
+            for heading in lean_sections(text) if text is not None else ():
                 canonical = "Proof depends on" if heading.casefold() == "proof depends on" else "Depends on"
                 report.add(9, rel(page, root), f"commits `## {canonical}`, which lean-facts writes at build time")
     try:
