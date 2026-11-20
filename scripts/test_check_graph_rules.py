@@ -271,9 +271,11 @@ class GraphRules(unittest.TestCase):
         groups = rules.strongly_connected({"a": {"b"}, "b": {"c"}, "c": {"a"}, "d": {"a"}})
         self.assertEqual(groups, [["a", "b", "c"]])
 
-    def test_a_graph_autoform_cannot_load_is_reported(self) -> None:
+    def test_a_graph_autoform_cannot_load_is_reported_under_autoforms_format(self) -> None:
         self.vault.write("blueprint/roadmap/Physics/mechanics.md", "No title.\n")
-        self.assertIn("autoform cannot load the graph", self.findings())
+        found = self.findings()
+        self.assertIn("autoform cannot load the graph", found)
+        self.assertIn("(Autoform's format)", found)
 
 
 class GitRules(unittest.TestCase):
@@ -390,6 +392,15 @@ class GitRules(unittest.TestCase):
         self.vault.write("note.txt", "unrelated\n")
         self.commit()
         self.assertEqual(self.run_main("--base", with_site, "--blocking"), 0)
+
+    def test_malformed_input_is_reported_and_report_only_still_exits_zero(self) -> None:
+        self.vault.annotations["Physics"].append({"subject": [{"type": "generic", "uri": None}]})
+        self.vault.save()
+        self.vault.write("blueprint/roadmap/Physics/README.md", "# Physics\n\n- [Mechanics](mechanics.md)\n- [Broken](bad%00.md)\n")
+        self.vault.write("blueprint/roadmap/Physics/mechanics.md", "No title.\n")
+        self.commit()
+        self.assertEqual(self.run_main("--base", self.base), 0)
+        self.assertEqual(self.run_main(), 0)
 
     def test_the_summary_and_annotations(self) -> None:
         self.vault.write("blueprint/roadmap/Physics/README.md", "# Physics\n")

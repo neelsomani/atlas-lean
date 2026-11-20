@@ -239,14 +239,20 @@ the daily build of `main`:
   (`duplicate-lean-target`, rule 6), overfull folders (rule 3), provenance and
   coverage gaps. The full report is kept as `build/audit.json`.
 
-Before opening a graph PR, run the same checks on the committed tree, with
-Autoform installed as below:
+Before opening a graph PR, run the checker and a first pass of the other two
+on the committed tree, with Autoform installed as below:
 
 ```sh
 python scripts/check_graph_rules.py --base origin/main
 autoform check blueprint
 autoform audit blueprint --lean-root . --json > audit.json
 ```
+
+The checker reads the committed tree, as CI does. `autoform check` and the
+audit run in CI after `lean-facts`, which adds the Lean's dependencies and
+status, so on the committed tree they are only a first pass; for CI's
+results, run the build steps in order as
+[Local environment and tests](#local-environment-and-tests) shows.
 
 ## Local environment and tests
 

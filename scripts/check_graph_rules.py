@@ -63,7 +63,8 @@ class Finding:
         return (self.rule, self.subject, self.detail)
 
     def __str__(self) -> str:
-        return f"{self.where or self.subject}: {self.detail} (rule {self.rule})"
+        rule = f"rule {self.rule}" if self.rule else "Autoform's format"
+        return f"{self.where or self.subject}: {self.detail} ({rule})"
 
 
 @dataclass
@@ -284,8 +285,9 @@ def check_edges(root: Path, annotations: dict[Path, dict], report: Report) -> No
     try:
         graph = graph_module.load_graph(vault)
     except graph_module.GraphValidationError as error:
+        # Not an ATLAS rule: Autoform's own format. `autoform check` reports the same issues after lean-facts.
         for issue in error.issues:
-            report.add(11, "blueprint", f"autoform cannot load the graph: {issue}")
+            report.add(0, "blueprint", f"autoform cannot load the graph: {issue}")
         return
     paths = {node_id: rel(Path(node.path), root) for node_id, node in graph.nodes.items()}
     for warning in graph.warnings:
@@ -461,7 +463,7 @@ def annotate(finding: Finding, level: str) -> str:
     parts = [f"file={path}"] if Path(path).suffix else []
     if line.isdigit():
         parts.append(f"line={line}")
-    title = f"title=Graph rule {finding.rule}"
+    title = f"title=Graph rule {finding.rule}" if finding.rule else "title=Autoform format"
     message = str(finding).replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
     return f"::{level} {','.join(parts + [title])}::{message}"
 
@@ -477,7 +479,8 @@ def summary(new: list[Finding], inherited: list[Finding], compared: bool, blocki
     for rule in rules:
         count_new = sum(finding.rule == rule for finding in new)
         count_old = sum(finding.rule == rule for finding in inherited)
-        lines.append(f"| {rule} | {count_new} | {count_old} |" if compared else f"| {rule} | {count_new} |")
+        name = rule or "format"
+        lines.append(f"| {name} | {count_new} | {count_old} |" if compared else f"| {name} | {count_new} |")
     shown = new[:50]
     if shown:
         lines += ["", "New findings:" if compared else "Findings:", ""] + [f"- {finding}" for finding in shown]
