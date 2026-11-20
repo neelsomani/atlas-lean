@@ -112,9 +112,19 @@ class GraphRules(unittest.TestCase):
         self.vault.annotations["CategoryTheory"][0]["id"] = "af_xyz"
         self.vault.save()
         found = self.findings()
-        self.assertIn("is also blueprint/roadmap/CategoryTheory/topos-theory/is-topos.md's", found)
+        self.assertIn("id af_111111111111111111111111 is shared by blueprint/roadmap/CategoryTheory/topos-theory/is-topos.md, "
+                      "blueprint/roadmap/Physics/mechanics.md", found)
         self.assertIn("malformed id 'af_xyz'", found)
         self.assertNotIn("fundamental.md", found)  # it has no id, which is not a finding (#5524)
+
+    def test_bad_subject_uris_and_link_targets_are_findings_not_crashes(self) -> None:
+        self.vault.annotations["Physics"].append({"subject": [{"type": "generic", "uri": None}]})
+        self.vault.annotations["Physics"].append(Vault.row("Physics/%6dechanics.md"))  # sync_wiki doesn't decode
+        self.vault.save()
+        self.vault.write("blueprint/roadmap/Physics/README.md", "# Physics\n\n- [Mechanics](mechanics.md)\n- [Bad](%00bad.md)\n")
+        found = self.findings()
+        self.assertIn("subject None is not a page under blueprint/roadmap/", found)
+        self.assertIn("its annotation names a page that does not exist", found)
 
     def test_an_annotation_names_at_most_one_declaration(self) -> None:
         self.vault.annotations["CategoryTheory"][2]["object"].append({"location": {"declaration": "X.other"}})
@@ -130,6 +140,10 @@ class GraphRules(unittest.TestCase):
         found = self.findings()
         self.assertIn("commits 'kind', which lean-facts adds at build time (rule 8)", found)
         self.assertIn("commits 'status'", found)
+
+    def test_the_shared_defaults_commit_no_derived_facts(self) -> None:
+        self.vault.write("blueprint/links/_defaults.json", json.dumps({"object": {"type": "lean", "uri": "../.."}, "kind": "theorem"}))
+        self.assertIn("blueprint/links/_defaults.json: the defaults commit 'kind'", self.findings())
 
     # Rule 12
 
@@ -224,7 +238,7 @@ class GraphRules(unittest.TestCase):
         errors = self.vault.check()
         self.assertEqual(len(errors), 2, errors)
         self.assertTrue(all("which lean-facts writes at build time (rule 9)" in error for error in errors), errors)
-        self.assertIn("topos-theory/fundamental.md: commits `## proof depends on`", errors[0])
+        self.assertIn("topos-theory/fundamental.md: commits `## Proof depends on`", errors[0])
         self.assertIn("topos-theory/is-topos.md: commits `## Depends on`", errors[1])
 
     # Rule 11
@@ -353,6 +367,21 @@ class GitRules(unittest.TestCase):
         self.vault.save()
         self.commit()
         self.assertEqual(self.run_main("--base", twice, "--blocking"), 1)
+
+    def test_reordering_rows_or_recasing_a_heading_does_not_make_an_old_finding_new(self) -> None:
+        self.vault.annotations["CategoryTheory"][3]["id"] = "af_" + "1" * 24  # shares Topos's id
+        self.vault.write("blueprint/roadmap/CategoryTheory/topos-theory/is-topos.md",
+                         "# Elementary topos\n\nA topos.\n\n## Depends on\n\nThis node has no prerequisites.\n")
+        self.vault.save()
+        self.commit()
+        broken = self.head()
+        rows = self.vault.annotations["CategoryTheory"]
+        rows[2], rows[3] = rows[3], rows[2]
+        self.vault.save()
+        self.vault.write("blueprint/roadmap/CategoryTheory/topos-theory/is-topos.md",
+                         "# Elementary topos\n\nA topos.\n\n## DEPENDS ON\n\nThis node has no prerequisites.\n")
+        self.commit()
+        self.assertEqual(self.run_main("--base", broken, "--blocking"), 0)
 
     def test_build_outputs_the_base_already_tracks_are_inherited(self) -> None:
         self.vault.write("site/index.html", "<html></html>")

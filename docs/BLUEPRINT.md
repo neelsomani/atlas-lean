@@ -217,7 +217,8 @@ the daily build of `main`:
   - rule 2: every page and subfolder is listed on its folder page;
   - rule 5: one annotation per page, in its subject's links file, naming at
     most one declaration, with a well-formed, unique `id` where it has one;
-  - rule 8: no build output and no `kind` or `status` row fact is committed;
+  - rule 8: no build output is tracked, and neither a row nor
+    `blueprint/links/_defaults.json` commits `kind` or `status`;
   - rules 9 and 10: no linked page commits `## Depends on` or
     `## Proof depends on`, while a planned page may;
   - rule 11: `## Informally uses` links existing pages, never the page

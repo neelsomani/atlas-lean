@@ -102,8 +102,11 @@ def local_targets(page: Path, text: str) -> list[Path]:
             continue
         if split.scheme or split.netloc or not split.path:
             continue
-        linked = (page.parent / unquote(split.path)).resolve()
-        targets.append(linked / "README.md" if linked.is_dir() else linked)
+        try:
+            linked = (page.parent / unquote(split.path)).resolve()
+            targets.append(linked / "README.md" if linked.is_dir() else linked)
+        except (OSError, ValueError):
+            continue  # no page; autoform check reports the link
     return targets
 
 
@@ -139,8 +142,18 @@ def load_annotations(root: Path, report: Report) -> dict[Path, dict]:
     roadmap = (vault / "roadmap").resolve()
     links = vault / "links"
     seen: dict[Path, str] = {}
-    ids: dict[str, str] = {}
+    ids: dict[str, list[tuple[str, str]]] = {}
     annotations: dict[Path, dict] = {}
+    defaults = links / "_defaults.json"
+    if defaults.is_file():
+        try:
+            shared = json.loads(defaults.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as error:
+            report.add(5, rel(defaults, root), f"not JSON ({error.msg})")
+        else:
+            for fact in DERIVED_FACTS:
+                if isinstance(shared, dict) and fact in shared:
+                    report.add(8, rel(defaults, root), f"the defaults commit {fact!r}, which lean-facts adds at build time")
     for source in sorted(links.rglob("*.jsonl")):
         name = rel(source, root)
         for number, line in enumerate(source.read_text(encoding="utf-8").splitlines(), 1):
@@ -156,9 +169,13 @@ def load_annotations(root: Path, report: Report) -> dict[Path, dict]:
             if not isinstance(subjects, list) or len(subjects) != 1 or not isinstance(subjects[0], dict):
                 report.add(5, name, "a row names exactly one subject page", at)
                 continue
-            uri = subjects[0].get("uri", "")
-            page = (source.parent / unquote(uri)).resolve()
-            if page.suffix != ".md" or roadmap not in page.parents:
+            uri = subjects[0].get("uri")
+            # Resolved as `sync_wiki.py` resolves it, with no decoding, so the two agree on which page a row names.
+            try:
+                page = (source.parent / uri).resolve() if isinstance(uri, str) and uri else None
+            except (OSError, ValueError):
+                page = None
+            if page is None or page.suffix != ".md" or roadmap not in page.parents:
                 report.add(5, name, f"subject {uri!r} is not a page under blueprint/roadmap/", at)
                 continue
             subject = rel(page, root)
@@ -180,15 +197,19 @@ def load_annotations(root: Path, report: Report) -> dict[Path, dict]:
             if article_id is not None:  # a missing id is not a finding until the one-off fill (#5524)
                 if not isinstance(article_id, str) or not ARTICLE_ID.fullmatch(article_id):
                     report.add(5, subject, f"malformed id {article_id!r}", at)
-                elif article_id in ids:
-                    report.add(5, subject, f"id {article_id} is also {ids[article_id]}'s", at)
                 else:
-                    ids[article_id] = subject
+                    ids.setdefault(article_id, []).append((subject, at))
             for fact in DERIVED_FACTS:
                 if fact in annotation:
                     report.add(8, subject, f"its annotation commits {fact!r}, which lean-facts adds at build time", at)
             annotation["_at"] = at
             annotations[page] = annotation
+    for article_id, owners in sorted(ids.items()):
+        if len(owners) > 1:
+            # One finding per collision, the same whichever row comes first.
+            pages = sorted(subject for subject, _ in owners)
+            report.add(5, pages[0], f"id {article_id} is shared by " + ", ".join(pages),
+                       ", ".join(at for _, at in sorted(owners, key=lambda owner: owner[0])))
     return annotations
 
 
@@ -258,7 +279,8 @@ def check_edges(root: Path, annotations: dict[Path, dict], report: Report) -> No
     for page, annotation in sorted(annotations.items()):
         if linked(annotation) and page.name != "README.md":
             for heading in lean_sections(page.read_text(encoding="utf-8")):
-                report.add(9, rel(page, root), f"commits `## {heading}`, which lean-facts writes at build time")
+                canonical = "Proof depends on" if heading.casefold() == "proof depends on" else "Depends on"
+                report.add(9, rel(page, root), f"commits `## {canonical}`, which lean-facts writes at build time")
     try:
         graph = graph_module.load_graph(vault)
     except graph_module.GraphValidationError as error:
@@ -434,7 +456,7 @@ def split_new(findings: list[Finding], known: list[Finding]) -> tuple[list[Findi
 
 def annotate(finding: Finding, level: str) -> str:
     """A GitHub Actions workflow command that shows `finding` on the run and the PR's files."""
-    location = finding.where or finding.subject
+    location = (finding.where or finding.subject).split(", ")[0]
     path, _, line = location.partition(":")
     parts = [f"file={path}"] if Path(path).suffix else []
     if line.isdigit():
