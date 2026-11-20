@@ -216,9 +216,13 @@ the daily build of `main`:
     (not module placements or subfields, which the generator lays out);
   - rule 2: every page and subfolder is listed on its folder page;
   - rule 5: one annotation per page, in its subject's links file, naming at
-    most one declaration, with a well-formed, unique `id` where it has one;
-  - rule 8: no build output is tracked, and neither a row nor
-    `blueprint/links/_defaults.json` commits `kind` or `status`;
+    most one declaration, with a well-formed, unique `id` where it has one,
+    and a subject URI with no percent-escape (`sync_wiki.py` reads it as
+    written and Autoform decodes it, so the two could bind different pages);
+    no other annotation file Autoform would read (a `.json`, a `.ndjson`, a
+    nested file or a second `_defaults.json`);
+  - rule 8: no build output is tracked, and neither a row nor a
+    `_defaults.json` commits `kind` or `status`;
   - rules 9 and 10: no linked page commits `## Depends on` or
     `## Proof depends on`, while a planned page may;
   - rule 11: `## Informally uses` links existing pages, never the page

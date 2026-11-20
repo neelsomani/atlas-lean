@@ -47,6 +47,10 @@ MAX_CHANGED_FILES = 3000
 OUTPUTS = ("site", "site-src", "build", "v2-dependencies.jsonl", "v2-dependencies.jsonl.gz", "v2-modules.txt")
 # Facts `lean-facts` adds to an annotation at build time (rule 8).
 DERIVED_FACTS = ("kind", "status")
+# The annotation files the pinned Autoform reads under blueprint/links/ (autoform_cli/annotations.py).
+DEFAULTS = "_defaults.json"
+ANNOTATION_LINES = (".jsonl", ".ndjson")
+ANNOTATION_SUFFIXES = (".json", *ANNOTATION_LINES)
 LEAN_SECTIONS = frozenset({"depends on", "proof depends on"})
 PARTS = ("annotations", "taxonomy", "listings", "edges", "outputs")
 
@@ -107,7 +111,7 @@ def local_targets(page: Path, text: str) -> list[Path]:
             linked = (page.parent / unquote(split.path)).resolve()
             targets.append(linked / "README.md" if linked.is_dir() else linked)
         except (OSError, ValueError):
-            continue  # no page; autoform check reports the link
+            continue  # a target no file can have (an encoded NUL, say) lists nothing; it is skipped, not reported
     return targets
 
 
@@ -138,6 +142,14 @@ def linked(annotation: dict) -> bool:
 # --------------------------------------------------------------------------- annotations: rules 5, 8, 12
 
 
+def annotation_rows(source: Path) -> list[tuple[int | None, str]]:
+    """The rows Autoform reads from a links file: one per line of a `.jsonl` or `.ndjson`, the whole of a `.json`."""
+    text = source.read_text(encoding="utf-8", errors="replace").replace("\r\n", "\n").replace("\r", "\n")
+    if source.name.lower().endswith(ANNOTATION_LINES):
+        return [(number, line) for number, line in enumerate(text.split("\n"), 1) if line.strip(" \t")]
+    return [(None, text)]
+
+
 def load_annotations(root: Path, report: Report) -> dict[Path, dict]:
     vault = root / "blueprint"
     roadmap = (vault / "roadmap").resolve()
@@ -145,22 +157,31 @@ def load_annotations(root: Path, report: Report) -> dict[Path, dict]:
     seen: dict[Path, str] = {}
     ids: dict[str, list[tuple[str, str]]] = {}
     annotations: dict[Path, dict] = {}
-    defaults = links / "_defaults.json"
-    if defaults.is_file():
-        try:
-            shared = json.loads(defaults.read_text(encoding="utf-8"))
-        except json.JSONDecodeError as error:
-            report.add(5, rel(defaults, root), f"not JSON ({error.msg})")
-        else:
+    files = sorted(path for path in links.rglob("*") if path.is_file() and not path.name.startswith("."))
+    for source in files:
+        name, lowered = rel(source, root), source.name.lower()
+        if not lowered.endswith(ANNOTATION_SUFFIXES):
+            continue
+        top_level = source.parent == links
+        if source.name == DEFAULTS:
+            # Autoform merges every defaults file into the rows below it, so none may add derived facts.
+            try:
+                shared = json.loads(source.read_text(encoding="utf-8"))
+            except (UnicodeError, json.JSONDecodeError) as error:
+                report.add(5, name, f"not JSON ({error})")
+                continue
             for fact in DERIVED_FACTS:
                 if isinstance(shared, dict) and fact in shared:
-                    report.add(8, rel(defaults, root), f"the defaults commit {fact!r}, which lean-facts adds at build time")
-    for source in sorted(links.rglob("*.jsonl")):
-        name = rel(source, root)
-        for number, line in enumerate(source.read_text(encoding="utf-8").splitlines(), 1):
-            if not line.strip():
-                continue
-            at = f"{name}:{number}"
+                    report.add(8, name, f"the defaults commit {fact!r}, which lean-facts adds at build time")
+            if not top_level:
+                report.add(5, name, f"Autoform merges this defaults file too; keep the one in blueprint/links/")
+            continue
+        if not (top_level and source.suffix == ".jsonl"):
+            # Autoform reads every .json, .jsonl and .ndjson file here, at any depth; sync_wiki.py reads only
+            # blueprint/links/<Subject>.jsonl, so annotations anywhere else are a second, unsynced source.
+            report.add(5, name, "Autoform reads this file, but annotations go in blueprint/links/<Subject>.jsonl")
+        for number, line in annotation_rows(source):
+            at = name if number is None else f"{name}:{number}"
             try:
                 annotation = json.loads(line)
             except json.JSONDecodeError as error:
@@ -171,7 +192,11 @@ def load_annotations(root: Path, report: Report) -> dict[Path, dict]:
                 report.add(5, name, "a row names exactly one subject page", at)
                 continue
             uri = subjects[0].get("uri")
-            # Resolved as `sync_wiki.py` resolves it, with no decoding, so the two agree on which page a row names.
+            # `sync_wiki.py` resolves a subject as written and Autoform decodes it first, so a URI that a
+            # percent-escape changes would bind different pages for the two; it is a finding, not a binding.
+            if isinstance(uri, str) and uri and unquote(uri) != uri:
+                report.add(5, name, f"subject {uri!r} has a percent-escape; write the page's path as it is", at)
+                continue
             try:
                 page = (source.parent / uri).resolve() if isinstance(uri, str) and uri else None
             except (OSError, ValueError):
@@ -183,14 +208,7 @@ def load_annotations(root: Path, report: Report) -> dict[Path, dict]:
             if not page.is_file():
                 report.add(5, subject, "its annotation names a page that does not exist", at)
                 continue
-            parts = page.relative_to(roadmap).parts
-            expected = "roadmap" if len(parts) == 1 else parts[0]
-            if source.relative_to(links).as_posix() != f"{expected}.jsonl":
-                report.add(5, subject, f"its annotation belongs in blueprint/links/{expected}.jsonl", at)
-            if page in seen:
-                report.add(5, subject, "the page has more than one annotation", at)
-                continue
-            seen[page] = at
+            # Every row is checked in full, a second row for a page included: Autoform merges them all.
             objects = annotation.get("object", [])
             if not isinstance(objects, list) or len(objects) > 1:
                 report.add(5, subject, "its annotation names more than one Lean declaration", at)
@@ -203,14 +221,24 @@ def load_annotations(root: Path, report: Report) -> dict[Path, dict]:
             for fact in DERIVED_FACTS:
                 if fact in annotation:
                     report.add(8, subject, f"its annotation commits {fact!r}, which lean-facts adds at build time", at)
+            if not top_level or source.suffix != ".jsonl":
+                continue
+            parts = page.relative_to(roadmap).parts
+            expected = "roadmap" if len(parts) == 1 else parts[0]
+            if source.name != f"{expected}.jsonl":
+                report.add(5, subject, f"its annotation belongs in blueprint/links/{expected}.jsonl", at)
+            if page in seen:
+                report.add(5, subject, "the page has more than one annotation", at)
+                continue
+            seen[page] = at
             annotation["_at"] = at
             annotations[page] = annotation
     for article_id, owners in sorted(ids.items()):
-        if len(owners) > 1:
+        if len({subject for subject, _ in owners}) > 1:
             # One finding per collision, the same whichever row comes first.
-            pages = sorted(subject for subject, _ in owners)
+            pages = sorted({subject for subject, _ in owners})
             report.add(5, pages[0], f"id {article_id} is shared by " + ", ".join(pages),
-                       ", ".join(at for _, at in sorted(owners, key=lambda owner: owner[0])))
+                       ", ".join(at for _, at in sorted(owners)))
     return annotations
 
 

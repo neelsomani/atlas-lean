@@ -117,14 +117,23 @@ class GraphRules(unittest.TestCase):
         self.assertIn("malformed id 'af_xyz'", found)
         self.assertNotIn("fundamental.md", found)  # it has no id, which is not a finding (#5524)
 
-    def test_bad_subject_uris_and_link_targets_are_findings_not_crashes(self) -> None:
+    def test_bad_subject_uris_are_findings_not_crashes(self) -> None:
         self.vault.annotations["Physics"].append({"subject": [{"type": "generic", "uri": None}]})
-        self.vault.annotations["Physics"].append(Vault.row("Physics/%6dechanics.md"))  # sync_wiki doesn't decode
         self.vault.save()
+        self.assertIn("subject None is not a page under blueprint/roadmap/", self.findings())
+
+    def test_a_percent_escaped_subject_uri_is_a_finding_since_sync_and_autoform_disagree(self) -> None:
+        # A literal `%6dechanics.md` beside `mechanics.md`: sync_wiki binds the row to the first, Autoform to the second.
+        self.vault.write("blueprint/roadmap/Physics/%6dechanics.md", "# Other\n\nOther.\n")
+        self.vault.write("blueprint/roadmap/Physics/README.md",
+                         "# Physics\n\n- [Mechanics](mechanics.md)\n- [Other](%256dechanics.md)\n")
+        self.vault.annotations["Physics"].append(Vault.row("Physics/%6dechanics.md", declaration="X.different"))
+        self.vault.save()
+        self.assertIn("subject '../roadmap/Physics/%6dechanics.md' has a percent-escape", self.findings())
+
+    def test_a_link_no_file_can_have_is_skipped(self) -> None:
         self.vault.write("blueprint/roadmap/Physics/README.md", "# Physics\n\n- [Mechanics](mechanics.md)\n- [Bad](%00bad.md)\n")
-        found = self.findings()
-        self.assertIn("subject None is not a page under blueprint/roadmap/", found)
-        self.assertIn("its annotation names a page that does not exist", found)
+        self.assertEqual(self.vault.check(), [])
 
     def test_an_annotation_names_at_most_one_declaration(self) -> None:
         self.vault.annotations["CategoryTheory"][2]["object"].append({"location": {"declaration": "X.other"}})
@@ -140,6 +149,30 @@ class GraphRules(unittest.TestCase):
         found = self.findings()
         self.assertIn("commits 'kind', which lean-facts adds at build time (rule 8)", found)
         self.assertIn("commits 'status'", found)
+
+    def test_annotation_files_autoform_reads_besides_the_subject_files_are_findings(self) -> None:
+        topos = Vault.row("CategoryTheory/topos-theory/is-topos.md", kind="theorem", status="formalized")
+        self.vault.write("blueprint/links/000.json", json.dumps(topos))
+        self.vault.write("blueprint/links/extra.ndjson", json.dumps(Vault.row("Physics/mechanics.md")) + "\n")
+        self.vault.write("blueprint/links/nested/Physics.jsonl", json.dumps(Vault.row("Physics/mechanics.md")) + "\n")
+        self.vault.write("blueprint/links/nested/_defaults.json", json.dumps({"status": "formalized"}))
+        self.vault.write("blueprint/links/README.txt", "not an annotation file\n")
+        found = self.findings()
+        for name in ("000.json", "extra.ndjson", "nested/Physics.jsonl"):
+            self.assertIn(f"blueprint/links/{name}: Autoform reads this file, but annotations go in", found)
+        self.assertIn("blueprint/links/000.json: its annotation commits 'kind'", found)
+        self.assertIn("blueprint/links/nested/_defaults.json: the defaults commit 'status'", found)
+        self.assertIn("nested/_defaults.json: Autoform merges this defaults file too", found)
+        self.assertNotIn("README.txt", found)
+
+    def test_a_second_row_for_a_page_is_checked_in_full(self) -> None:
+        self.vault.annotations["CategoryTheory"].append(
+            Vault.row("CategoryTheory/topos-theory/is-topos.md", kind="theorem", status="formalized", id="af_bad"))
+        self.vault.save()
+        found = self.findings()
+        self.assertIn("the page has more than one annotation", found)
+        self.assertIn("its annotation commits 'kind'", found)
+        self.assertIn("malformed id 'af_bad'", found)
 
     def test_the_shared_defaults_commit_no_derived_facts(self) -> None:
         self.vault.write("blueprint/links/_defaults.json", json.dumps({"object": {"type": "lean", "uri": "../.."}, "kind": "theorem"}))
@@ -385,6 +418,16 @@ class GitRules(unittest.TestCase):
         self.commit()
         self.assertEqual(self.run_main("--base", broken, "--blocking"), 0)
 
+    def test_an_inherited_duplicate_does_not_hide_new_facts_on_it(self) -> None:
+        self.vault.annotations["CategoryTheory"].append(Vault.row("CategoryTheory/topos-theory/is-topos.md"))
+        self.vault.save()
+        self.commit()
+        duplicate = self.head()
+        self.vault.annotations["CategoryTheory"][-1].update(kind="theorem", status="formalized")
+        self.vault.save()
+        self.commit()
+        self.assertEqual(self.run_main("--base", duplicate, "--blocking"), 1)
+
     def test_build_outputs_the_base_already_tracks_are_inherited(self) -> None:
         self.vault.write("site/index.html", "<html></html>")
         self.commit()
@@ -394,13 +437,19 @@ class GitRules(unittest.TestCase):
         self.assertEqual(self.run_main("--base", with_site, "--blocking"), 0)
 
     def test_malformed_input_is_reported_and_report_only_still_exits_zero(self) -> None:
-        self.vault.annotations["Physics"].append({"subject": [{"type": "generic", "uri": None}]})
-        self.vault.save()
-        self.vault.write("blueprint/roadmap/Physics/README.md", "# Physics\n\n- [Mechanics](mechanics.md)\n- [Broken](bad%00.md)\n")
-        self.vault.write("blueprint/roadmap/Physics/mechanics.md", "No title.\n")
-        self.commit()
-        self.assertEqual(self.run_main("--base", self.base), 0)
-        self.assertEqual(self.run_main(), 0)
+        for change in ("uri", "nul", "title"):
+            self.git("reset", "-q", "--hard", self.base)
+            if change == "uri":
+                self.vault.annotations["Physics"].append({"subject": [{"type": "generic", "uri": None}]})
+                self.vault.save()
+            elif change == "nul":
+                self.vault.write("blueprint/roadmap/Physics/README.md", "# Physics\n\n- [Mechanics](mechanics.md)\n- [Broken](bad%00.md)\n")
+            else:
+                self.vault.write("blueprint/roadmap/Physics/mechanics.md", "No title.\n")
+            self.commit()
+            self.assertEqual(self.run_main("--base", self.base), 0, change)
+            self.assertEqual(self.run_main(), 0, change)
+            self.vault = Vault(self.root)
 
     def test_the_summary_and_annotations(self) -> None:
         self.vault.write("blueprint/roadmap/Physics/README.md", "# Physics\n")
