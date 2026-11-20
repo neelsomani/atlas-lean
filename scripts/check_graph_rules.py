@@ -150,6 +150,41 @@ def annotation_rows(source: Path) -> list[tuple[int | None, str]]:
     return [(None, text)]
 
 
+def links_files(links: Path) -> list[Path]:
+    """The files under blueprint/links/ the pinned Autoform reads (autoform_cli/annotations.py): no dot-named
+    file or folder, and no symbolic link, which Autoform does not follow."""
+    found: list[Path] = []
+    pending = [links]
+    while pending:
+        folder = pending.pop()
+        try:
+            entries = sorted(os.scandir(folder), key=lambda entry: entry.name)
+        except OSError:
+            continue
+        for entry in entries:
+            if entry.name.startswith(".") or entry.is_symlink():
+                continue
+            if entry.is_dir(follow_symlinks=False):
+                pending.append(Path(entry.path))
+            elif entry.is_file(follow_symlinks=False):
+                found.append(Path(entry.path))
+    return sorted(found)
+
+
+def check_row_extensions(subject: str, annotation: dict, page: Path, at: str, report: Report) -> None:
+    """Rule 12, on one row: `not_ready` is a boolean, on an article with no Lean link."""
+    extensions = annotation.get("extensions", {})
+    ours = extensions.get(AUTOFORM, {}) if isinstance(extensions, dict) else {}
+    if not isinstance(ours, dict) or NOT_READY not in ours:
+        return
+    if not isinstance(ours[NOT_READY], bool):
+        report.add(12, subject, f"{NOT_READY} takes true or false; Autoform drops any other value", at)
+    elif ours[NOT_READY] and linked(annotation):
+        report.add(12, subject, f"a node still to be broken down ({NOT_READY}) names no Lean declaration", at)
+    elif ours[NOT_READY] and page.name == "README.md":
+        report.add(12, subject, f"a folder page is not a node to break down; mark an article {NOT_READY}", at)
+
+
 def load_annotations(root: Path, report: Report) -> dict[Path, dict]:
     vault = root / "blueprint"
     roadmap = (vault / "roadmap").resolve()
@@ -157,8 +192,7 @@ def load_annotations(root: Path, report: Report) -> dict[Path, dict]:
     seen: dict[Path, str] = {}
     ids: dict[str, list[tuple[str, str]]] = {}
     annotations: dict[Path, dict] = {}
-    files = sorted(path for path in links.rglob("*") if path.is_file() and not path.name.startswith("."))
-    for source in files:
+    for source in links_files(links):
         name, lowered = rel(source, root), source.name.lower()
         if not lowered.endswith(ANNOTATION_SUFFIXES):
             continue
@@ -221,6 +255,7 @@ def load_annotations(root: Path, report: Report) -> dict[Path, dict]:
             for fact in DERIVED_FACTS:
                 if fact in annotation:
                     report.add(8, subject, f"its annotation commits {fact!r}, which lean-facts adds at build time", at)
+            check_row_extensions(subject, annotation, page, at, report)
             if not top_level or source.suffix != ".jsonl":
                 continue
             parts = page.relative_to(roadmap).parts
@@ -240,21 +275,6 @@ def load_annotations(root: Path, report: Report) -> dict[Path, dict]:
             report.add(5, pages[0], f"id {article_id} is shared by " + ", ".join(pages),
                        ", ".join(at for _, at in sorted(owners)))
     return annotations
-
-
-def check_not_ready(root: Path, annotations: dict[Path, dict], report: Report) -> None:
-    for page, annotation in annotations.items():
-        extensions = annotation.get("extensions", {})
-        ours = extensions.get(AUTOFORM, {}) if isinstance(extensions, dict) else {}
-        if not isinstance(ours, dict) or NOT_READY not in ours:
-            continue
-        subject, at = rel(page, root), annotation["_at"]
-        if not isinstance(ours[NOT_READY], bool):
-            report.add(12, subject, f"{NOT_READY} takes true or false; Autoform drops any other value", at)
-        elif ours[NOT_READY] and linked(annotation):
-            report.add(12, subject, f"a node still to be broken down ({NOT_READY}) names no Lean declaration", at)
-        elif ours[NOT_READY] and page.name == "README.md":
-            report.add(12, subject, f"a folder page is not a node to break down; mark an article {NOT_READY}", at)
 
 
 # --------------------------------------------------------------------------- taxonomy and listings: rules 1, 2
@@ -424,9 +444,7 @@ def check(root: Path = ROOT, base: str | None = None, parts: tuple[str, ...] = P
     annotations: dict[Path, dict] = {}
     if {"annotations", "edges"} & set(parts):
         annotations = load_annotations(root, report)
-        if "annotations" in parts:
-            check_not_ready(root, annotations, report)
-        else:
+        if "annotations" not in parts:
             del report.findings[done:]
         tag("annotations")
     if "taxonomy" in parts:

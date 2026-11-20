@@ -165,14 +165,23 @@ class GraphRules(unittest.TestCase):
         self.assertIn("nested/_defaults.json: Autoform merges this defaults file too", found)
         self.assertNotIn("README.txt", found)
 
+    def test_links_files_are_found_as_autoform_finds_them(self) -> None:
+        self.vault.write("blueprint/links/.scratch/extra.json", json.dumps(Vault.row("Physics/mechanics.md")))
+        target = self.vault.root / "elsewhere.json"
+        target.write_text(json.dumps(Vault.row("Physics/mechanics.md", kind="theorem")))
+        (self.vault.root / "blueprint/links/linked.json").symlink_to(target)
+        self.assertEqual(self.vault.check(), [])  # Autoform skips dot-named folders and does not follow symlinks
+
     def test_a_second_row_for_a_page_is_checked_in_full(self) -> None:
         self.vault.annotations["CategoryTheory"].append(
-            Vault.row("CategoryTheory/topos-theory/is-topos.md", kind="theorem", status="formalized", id="af_bad"))
+            Vault.row("CategoryTheory/topos-theory/is-topos.md", kind="theorem", status="formalized", id="af_bad",
+                      extensions={rules.AUTOFORM: {rules.NOT_READY: "yes"}}))
         self.vault.save()
         found = self.findings()
         self.assertIn("the page has more than one annotation", found)
         self.assertIn("its annotation commits 'kind'", found)
         self.assertIn("malformed id 'af_bad'", found)
+        self.assertIn("not_ready takes true or false", found)
 
     def test_the_shared_defaults_commit_no_derived_facts(self) -> None:
         self.vault.write("blueprint/links/_defaults.json", json.dumps({"object": {"type": "lean", "uri": "../.."}, "kind": "theorem"}))
@@ -424,6 +433,12 @@ class GitRules(unittest.TestCase):
         self.commit()
         duplicate = self.head()
         self.vault.annotations["CategoryTheory"][-1].update(kind="theorem", status="formalized")
+        self.vault.save()
+        self.commit()
+        self.assertEqual(self.run_main("--base", duplicate, "--blocking"), 1)
+        self.git("reset", "-q", "--hard", duplicate)
+        self.vault.annotations["CategoryTheory"][-1] = Vault.row(
+            "CategoryTheory/topos-theory/is-topos.md", extensions={rules.AUTOFORM: {rules.NOT_READY: "yes"}})
         self.vault.save()
         self.commit()
         self.assertEqual(self.run_main("--base", duplicate, "--blocking"), 1)
