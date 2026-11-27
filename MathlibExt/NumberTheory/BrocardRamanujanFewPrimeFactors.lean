@@ -25,8 +25,9 @@ than `l` distinct prime divisors, then `y ≤ (2 ^ (l - 1)) ^ n`. Taking `y` to 
 qualifying neighbour of `x` bounds `x ^ 2` by an exponential, which `n!` eventually exceeds.
 
 The prime-power bound adapts the `hfactor` argument in
-`MathlibExt.NumberTheory.FactorialDivisorBound`, and the factorization `n! = m * (m + 2)`
-with its two divisor witnesses adapts `MathlibExt.NumberTheory.BrocardRamanujanPowerFree`.
+`MathlibExt.NumberTheory.FactorialDivisorBound`, and the substitution `x = m + 1`,
+the factorization `n! = m * (m + 2)`, and the two divisor witnesses are adapted from
+`MathlibExt.NumberTheory.BrocardRamanujanPowerFree`.
 
 ## References
 
