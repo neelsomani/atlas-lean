@@ -16,17 +16,23 @@ public import MathlibExt.NumberTheory.OddMultiplePrimeHalfSets
 # The diagonal is zigzag-below every odd Göbel residue walk
 
 For an odd prime `p` and an odd `l < p`, the diagonal `n ↦ n` is zigzag-below the residue walk
-`gobelResidueWalk p l` up to `p`.
+`gobelResidueWalk p l` up to `p`. For any natural numbers `p` and `l < p`, every term of the
+residue walk is at most `p`.
 
-Source: Yuh Kobayashi and Shin-ichiro Seki, *A Note on Non-Integrality of the (k, l)-Göbel
-Sequences*, Journal of Integer Sequences 29 (2026), Article 26.3.8, Proposition 9.
+## References
+
+* Yuh Kobayashi and Shin-ichiro Seki, *A Note on Non-Integrality of the (k, l)-Göbel Sequences*,
+  Journal of Integer Sequences **29** (2026), Article 26.3.8, pp. 1–25, Definition 5 and
+  Proposition 9.
 -/
 
 namespace MetaMathlibExt
 
 @[expose] public section
 
-private theorem gobelResidueWalk_le (p l : ℕ) (hlp : l < p) (n : ℕ) :
+/-- **Upper bound for the Göbel residue walk.** For natural numbers $p$, $l$ and $n$ with
+$l < p$, the residue walk for $p$ starting at $l$ stays at or below $p$ at index $n$. -/
+public theorem gobelResidueWalk_le (p l : ℕ) (hlp : l < p) (n : ℕ) :
     gobelResidueWalk p l n ≤ p := by
   have h0 : 0 ≤ n := Nat.zero_le n
   induction n, h0 using Nat.le_induction with

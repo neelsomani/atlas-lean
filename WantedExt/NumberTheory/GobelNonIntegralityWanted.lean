@@ -12,6 +12,7 @@ import Batteries.Util.ProofWanted
 public import Mathlib.Analysis.Convex.Hull
 public import MathlibExt.NumberTheory.ArithmeticBilliardsRotatedRectangle
 public import MathlibExt.NumberTheory.GobelBSequence
+public import MathlibExt.NumberTheory.GobelHalfPrimeResidueWalk
 public import MathlibExt.NumberTheory.OddMultiplePrimeHalfSets
 public import WantedExt.NumberTheory.GobelSequenceWanted
 public import MathlibExt.NumberTheory.GobelNonIntegralityDiagonalIsZigzagBelowGobelResidueWalkOfOdd
@@ -100,25 +101,6 @@ public theorem_wanted gobelSequence_nonintegral_congruence_class_of_odd_multiple
       ∀ l', 0 < l' → l' % p = l % p →
         padicValRat p (gobelSequence k l' p) < 0 ∧
         ∃ n, 1 ≤ n ∧ n ≤ p ∧ ¬∃ z : ℤ, gobelSequence k l' n = z
-
-/-- **Index-scaled Göbel terms with $k = (p-1)/2$ are congruent to the residue walk.** Let $p$
-be an odd prime and $l \le p - 1$ a natural number. Write $k = (p-1)/2$, let $g_{k,l}$ be the
-$(k,l)$-Göbel sequence, and let $\tilde g_l$ be the residue walk of $p$ starting at $l$. Then
-(a) for every $1 \le n \le p$, the rational number $n\,g_{k,l}(n) - \tilde g_l(n)$ is either $0$
-or has $p$-adic valuation at least $1$, that is,
-$n\,g_{k,l}(n) \equiv \tilde g_l(n) \pmod{p}$ in $\mathbb{Z}_{(p)}$; and (b) $g_{k,l}(p)$ lies in
-the localization $\mathbb{Z}_{(p)}$, that is, has nonnegative $p$-adic valuation, if and only if
-$\tilde g_l(p) = 0$ or $\tilde g_l(p) = p$.
-
-Source: Yuh Kobayashi and Shin-ichiro Seki, *A Note on Non-Integrality of the (k, l)-Göbel
-Sequences*, Journal of Integer Sequences 29 (2026), Article 26.3.8, Lemma 6. -/
-public theorem_wanted gobelSequence_half_pred_congruent_residue_walk
-    (p l : ℕ) (hp : p.Prime) (hpodd : Odd p) (hl : l ≤ p - 1) :
-    (∀ n, 1 ≤ n → n ≤ p →
-      let d : ℚ := (n : ℚ) * gobelSequence ((p - 1) / 2) l n - gobelResidueWalk p l n
-      d = 0 ∨ 1 ≤ padicValRat p d) ∧
-    (0 ≤ padicValRat p (gobelSequence ((p - 1) / 2) l p) ↔
-      gobelResidueWalk p l p = 0 ∨ gobelResidueWalk p l p = p)
 
 /-- **Even residue walks lie zigzag-below the antidiagonal when $p \equiv 3 \pmod 4$.** Let $p$
 be a prime with $p \equiv 3 \pmod 4$, let $l < p$ be an even natural number, and write
