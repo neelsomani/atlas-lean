@@ -18,6 +18,14 @@ public import MathlibExt.Combinatorics.Additive.RestrictedSignedSumset
 
 For a finite set containing zero, a subset sum with a bounded number of terms can be written
 as a generalized sum with a fixed number of terms by padding with zeros.
+
+## References
+
+* Raj Kumar Mistri, *Subset and Subsequence Sums with Bounded Numbers of Terms*,
+  INTEGERS 24 (2024), Article A116, pp. 1–35, Sections 1 and 4, Lemmas 1–3 and Theorems 7–8.
+* The translation-invariance proof comes from
+  `MathlibExt.Combinatorics.Additive.BoundedSubsequenceSumsPositive`, where
+  `card_generalizedHFoldSumset_sub_const` was used to prove the sharp bound for positive sequences.
 -/
 
 namespace MetaMathlibExt
@@ -66,6 +74,22 @@ public theorem generalizedHFoldSumset_comp_perm {G : Type*} [AddCommMonoid G]
   · rintro ⟨s, ⟨hs, htotal⟩, hsum⟩
     exact ⟨s ∘ π, ⟨fun i => hs (π i), (Equiv.sum_comp π s).trans htotal⟩,
       (Equiv.sum_comp π (fun i => s i • a i)).trans hsum⟩
+
+/-- **Translation invariance of the generalized sumset cardinality.** Subtracting `c` from
+all terms translates every admissible `h`-term sum by `-h • c`, preserving the cardinality. -/
+theorem card_generalizedHFoldSumset_sub_const {G : Type*} [AddCommGroup G] [DecidableEq G]
+    {k : ℕ} (a : Fin k → G) (r : Fin k → ℕ) (h : ℕ) (c : G) :
+    (generalizedHFoldSumset (fun i => a i - c) r h).card =
+      (generalizedHFoldSumset a r h).card := by
+  have htranslate : generalizedHFoldSumset (fun i => a i - c) r h =
+      (generalizedHFoldSumset a r h).image (fun x => x - h • c) := by
+    simp only [generalizedHFoldSumset, Finset.image_image]
+    apply Finset.image_congr
+    intro s hs
+    -- Each admissible coefficient vector has the same total, so the shift is constant.
+    have hlen : ∑ i, s i = h := (Finset.mem_filter.mp (Finset.mem_coe.mp hs)).2
+    simp only [Function.comp_apply, nsmul_sub, Finset.sum_sub_distrib, Finset.sum_nsmul_assoc, hlen]
+  rw [htranslate, Finset.card_image_of_injective _ sub_left_injective]
 
 /-- **The Yang–Chen bound.** Let $k, h \in \mathbb{N}$ and $\bar r = (r_0, \dots, r_{k-1})$ with
 all $r_j \in \mathbb{N}$; all sums below run over indices $j \in \{0, \dots, k-1\}$. Let $\mu$ be
@@ -153,6 +177,14 @@ Source: Raj Kumar Mistri, *Subset and Subsequence Sums with Bounded Numbers of T
 (2024), Article A116, Section 4 (notation `(A, t̄)` for a finite sequence). -/
 def repetitionSequence {G : Type*} {k : ℕ} (a : Fin k → G) (t : Fin k → ℕ) : Multiset G :=
   ∑ i, Multiset.replicate (t i) (a i)
+
+/-- **Concatenating sequences with repetitions.** The multiset obtained by concatenating the
+value and multiplicity tuples is the sum of the multisets obtained from the two blocks. -/
+theorem repetitionSequence_append {G : Type*} {m n : ℕ} (a : Fin m → G) (b : Fin n → G)
+    (r : Fin m → ℕ) (s : Fin n → ℕ) :
+    repetitionSequence (Fin.append a b) (Fin.append r s) =
+      repetitionSequence a r + repetitionSequence b s := by
+  simp only [repetitionSequence, Fin.sum_univ_add, Fin.append_left, Fin.append_right]
 
 /-- **Length of a sequence with repetitions.** Let $G$ be a set, $a_0, \dots, a_{k-1} \in G$ (not
 necessarily distinct), $t_0, \dots, t_{k-1}$ natural numbers, $A = (a_0, \dots, a_{k-1})$ and

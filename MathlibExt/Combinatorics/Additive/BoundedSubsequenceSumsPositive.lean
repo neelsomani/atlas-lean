@@ -17,26 +17,14 @@ public import MathlibExt.Combinatorics.Additive.YangChen
 
 Padding with zero gives the Yang–Chen lower bound. To obtain equality, translate the
 extremizing generalized sumset so that its least term is zero.
+## References
+
+* Raj Kumar Mistri, *Subset and Subsequence Sums with Bounded Numbers of Terms*,
+  INTEGERS 24 (2024), Article A116, pp. 1–35, Lemma 4 and Theorems 2 and 13.
 -/
 
 namespace MetaMathlibExt
 
-private theorem card_generalizedHFoldSumset_sub_const {G : Type*} [AddCommGroup G] [DecidableEq G]
-    {k : ℕ} (a : Fin k → G) (r : Fin k → ℕ) (h : ℕ) (c : G) :
-    (generalizedHFoldSumset (fun i => a i - c) r h).card =
-      (generalizedHFoldSumset a r h).card := by
-  have htranslate : generalizedHFoldSumset (fun i => a i - c) r h =
-      (generalizedHFoldSumset a r h).image (fun x => x - h • c) := by
-    simp only [generalizedHFoldSumset, Finset.image_image]
-    apply Finset.image_congr
-    intro s hs
-    -- Each admissible coefficient vector has the same total, so the shift is constant.
-    have hlen : ∑ i, s i = h := (Finset.mem_filter.mp (Finset.mem_coe.mp hs)).2
-    simp only [Function.comp_apply, nsmul_sub, Finset.sum_sub_distrib, Finset.sum_nsmul_assoc, hlen]
-  rw [htranslate, Finset.card_image_of_injective _ sub_left_injective]
-
--- Keep the source's named hypothesis `hk`, although the reduction does not need it.
-set_option linter.unusedVariables false in
 /-- **Lower bound for bounded subsequence sums of a positive sequence.** Let $k \ge 2$, let
 $t_1, \dots, t_k$ be positive integers, let $h = t_1 + \dots + t_k$, and let $\alpha, \beta$ be
 natural numbers with $1 \le \alpha$ and $\alpha + \beta \le h - 1$. Put
@@ -58,6 +46,8 @@ public theorem card_boundedSubsequenceSums_ge_of_pos {k : ℕ} (hk : 2 ≤ k)
     ∃ b : Fin k → ℤ, StrictMono b ∧ (∀ i, 0 < b i) ∧
       ((boundedSubsequenceSums α β (repetitionSequence b t)).card : ℤ) =
         yangChenBound (Fin.cons (h - α - β) t : Fin (k + 1) → ℕ) (h - β) := by
+  -- Keep the source's named hypothesis, although the reduction does not need it.
+  have _ := hk
   let r : Fin (k + 1) → ℕ := Fin.cons (h - α - β) t
   have hr (i : Fin (k + 1)) : 0 < r i :=
     Fin.cases (show 0 < h - α - β by omega) ht i

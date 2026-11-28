@@ -14,6 +14,7 @@ public import Mathlib.Algebra.Group.Pointwise.Finset.Scalar
 public import Mathlib.Data.Int.Interval
 public import MathlibExt.Combinatorics.AP.Basic
 public import MathlibExt.Combinatorics.Additive.BoundedSubsequenceSums
+public import MathlibExt.Combinatorics.Additive.BoundedSubsequenceSumsMixedSign
 public import MathlibExt.Combinatorics.Additive.BoundedSubsequenceSumsPositive
 public import MathlibExt.Combinatorics.Additive.YangChen
 
@@ -256,32 +257,6 @@ public theorem_wanted card_boundedSubsequenceSums_ge_of_nonneg_zero {m : ℕ} (h
       ((boundedSubsequenceSums α β
           (repetitionSequence (Fin.cons 0 b : Fin (m + 1) → ℤ) t)).card : ℤ) =
         yangChenBound (Fin.cons (h - α - β + t 0) (Fin.tail t) : Fin (m + 1) → ℕ) (h - β)
-
-/-- **Lower bound for bounded subsequence sums of a mixed-sign sequence.** Let $1 \le n \le p$, let
-$t_0, \dots, t_{n-1}$ and $t_{n+1}, \dots, t_{n+p}$ be positive integers, let $h$ be their sum,
-and let $\alpha, \beta$ be natural numbers with $1 \le \alpha$ and $\alpha + \beta \le h - 1$.
-Put $\bar r = (t_0, \dots, t_{n-1}, h - \alpha - \beta, t_{n+1}, \dots, t_{n+p})$. For integers
-$c_0 < \dots < c_{n-1} < 0 < d_1 < \dots < d_p$, let $\mathcal{A}$ be the sequence in which
-$c_i$ occurs $t_i$ times and $d_j$ occurs $t_{n+j}$ times. Then
-$|\Sigma^{\beta}_{\alpha}(\mathcal{A})| \ge L(\bar r, h - \beta)$ for all such $c$ and $d$, and
-equality holds for some such $c$ and $d$. Here $\Sigma^{\beta}_{\alpha}(\mathcal{A})$ is the set
-of sums of subsequences of $\mathcal{A}$ with at least $\alpha$ and at most $h - \beta$ terms, and
-$L$ is the Yang–Chen bound.
-
-Source: Raj Kumar Mistri, *Subset and Subsequence Sums with Bounded Numbers of Terms*, INTEGERS 24
-(2024), Article A116, Theorem 15 (`integers-2024-A116-thm-15`). -/
-public theorem_wanted card_boundedSubsequenceSums_ge_mixedSign {n p : ℕ} (hn : 1 ≤ n)
-    (hnp : n ≤ p) (tn : Fin n → ℕ) (tp : Fin p → ℕ) (htn : ∀ i, 0 < tn i)
-    (htp : ∀ j, 0 < tp j) (h : ℕ) (hh : h = ∑ i, tn i + ∑ j, tp j) (α β : ℕ) (hα : 1 ≤ α)
-    (hαβ : α + β + 1 ≤ h) :
-    (∀ (c : Fin n → ℤ) (d : Fin p → ℤ), StrictMono c → (∀ i, c i < 0) → StrictMono d →
-      (∀ j, 0 < d j) →
-      yangChenBound (Fin.append tn (Fin.cons (h - α - β) tp)) (h - β) ≤
-        (boundedSubsequenceSums α β (repetitionSequence c tn + repetitionSequence d tp)).card) ∧
-    ∃ (c : Fin n → ℤ) (d : Fin p → ℤ), StrictMono c ∧ (∀ i, c i < 0) ∧ StrictMono d ∧
-      (∀ j, 0 < d j) ∧
-      ((boundedSubsequenceSums α β (repetitionSequence c tn + repetitionSequence d tp)).card :
-          ℤ) = yangChenBound (Fin.append tn (Fin.cons (h - α - β) tp)) (h - β)
 
 /-- **Lower bound for bounded subsequence sums of a mixed-sign sequence containing zero.** Let
 $1 \le n \le p$, let $t_0, \dots, t_{n-1}$, $t_n$ and $t_{n+1}, \dots, t_{n+p}$ be positive
