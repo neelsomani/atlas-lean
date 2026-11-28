@@ -27,6 +27,7 @@ public import MathlibExt.NumberTheory.RamanujanTauModSeventeen
 public import MathlibExt.NumberTheory.RamanujanTauModThree
 public import MathlibExt.NumberTheory.GeneralizedTauRegularPartitionCardPrimeRegularModEqGeneralizedTauPred
 public import MathlibExt.NumberTheory.GeneralizedTauCoprime
+public import MathlibExt.NumberTheory.GeneralizedTauPrimePower
 
 /-!
 # Regular partition functions and a generalized tau function
@@ -242,23 +243,6 @@ public theorem_wanted ramanujanTau_succ_modEq_five_regular_sum_twentyfive (n : �
             ((Nat.Partition.restricted (n - 5 * (s * (s + 1) / 2) - 5 * pentagonal t)
                 (¬ 5 ∣ ·)).card : ℤ)
         else 0 [ZMOD 25]
-
-/-- **Generalized tau at a prime power modulo the prime.** Let $p$ be a prime, let $s \ge 1$ and
-$n \ge 0$ be natural numbers, and for an integer $t$ let $P(t) = t(3t - 1)/2$ be the generalized
-pentagonal number. Then $\tau_{p^s}(n + 1)$ is congruent modulo $p$ to the sum of $(-1)^t$ over
-the integers $t$ with $-n \le t \le n$ and $n = p^s P(t)$.
-
-Since $P$ is injective, this sum has at most one term: $\tau_{p^s}(n + 1) \equiv (-1)^t \pmod{p}$
-if $n = p^s P(t)$, and $\tau_{p^s}(n + 1) \equiv 0 \pmod{p}$ if $n$ is not of this form.
-
-Source: S. Sriram and A. David Christopher, *Congruences Relating Regular Partition Functions, a
-Generalized Tau Function, and Partition Function Weighted Composition Sums*, INTEGERS 24 (2024),
-Article A39, Theorem 15 (`integers-2024-A39-thm-15`). -/
-public theorem_wanted generalizedTau_prime_pow_succ_modEq (p : ℕ) (hp : p.Prime) (s : ℕ)
-    (hs : 0 < s) (n : ℕ) :
-    generalizedTau ((p ^ s : ℕ) : ℤ) (n + 1) ≡
-      ∑ t ∈ Finset.Icc (-(n : ℤ)) n,
-          if n = p ^ s * pentagonal t then (t.negOnePow : ℤ) else 0 [ZMOD p]
 
 /-- **Generalized tau function $\tau_{2p}$ modulo $p$.** Let $p$ be an odd prime, let $\tau_k$ be
 the generalized tau function, and for an integer $r$ let $P(r) = r(3r - 1)/2$ be the generalized

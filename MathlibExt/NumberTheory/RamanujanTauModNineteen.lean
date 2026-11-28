@@ -13,6 +13,7 @@ public import MathlibExt.NumberTheory.GeneralizedTau
 import Mathlib.FieldTheory.Finite.Basic
 import Mathlib.RingTheory.PowerSeries.Expand
 import Mathlib.Tactic.NormNum.Prime
+import MathlibExt.Combinatorics.Enumerative.PentagonalExpand
 
 /-!
 # Ramanujan's tau function modulo 19
@@ -37,35 +38,6 @@ namespace MetaMathlibExt
 open PowerSeries
 
 namespace ramanujanTau_succ_modEq_pentagonal_tau_five
-
-/-- An integer `r` with `P(r) ≤ n` lies in `[-n, n]`, since `|r| ≤ P(r)`. -/
-private theorem mem_Icc_of_pentagonal_le {r : ℤ} {n : ℕ} (h : pentagonal r ≤ n) :
-    r ∈ Finset.Icc (-(n : ℤ)) n := by
-  have h₂ := two_mul_natCast_pentagonal r
-  have h' : (pentagonal r : ℤ) ≤ n := by exact_mod_cast h
-  rw [Finset.mem_Icc]
-  constructor <;> nlinarith
-
-/-- For `j ≤ n`, the coefficient of `X ^ j` in `∑_r (-1)^r X^(p P(r))`, the expansion of Euler's
-pentagonal series by `p`, is a finite sum over `r ∈ [-n, n]`. -/
-private theorem coeff_expand_pentagonalSeries (p : ℕ) (hp : p ≠ 0) {j n : ℕ} (hj : j ≤ n) :
-    coeff j (expand p hp (pentagonalSeries ℤ)) =
-      ∑ r ∈ Finset.Icc (-(n : ℤ)) n, if p * pentagonal r = j then (r.negOnePow : ℤ) else 0 := by
-  rw [coeff_expand]
-  split_ifs with hdvd
-  · obtain ⟨m, rfl⟩ := hdvd
-    rw [Nat.mul_div_cancel_left _ (Nat.pos_of_ne_zero hp)]
-    simp_rw [Nat.mul_left_cancel_iff (Nat.pos_of_ne_zero hp)]
-    by_cases hm : m ∈ Set.range pentagonal
-    · obtain ⟨r₀, rfl⟩ := hm
-      have hle : pentagonal r₀ ≤ n :=
-        (Nat.le_mul_of_pos_left _ (Nat.pos_of_ne_zero hp)).trans hj
-      rw [coeff_pentagonalSeries_pentagonal, Int.cast_id]
-      simp_rw [pentagonal_inj]
-      rw [Finset.sum_ite_eq', ite_eq_left (mem_Icc_of_pentagonal_le hle)]
-    · rw [coeff_pentagonalSeries_eq_zero ℤ hm]
-      exact (Finset.sum_eq_zero fun r _ => ite_eq_right fun h => hm ⟨r, h⟩).symm
-  · exact (Finset.sum_eq_zero fun r _ => ite_eq_right fun h => hdvd ⟨_, h.symm⟩).symm
 
 /-- Multiplying a power series `A` by `∏ (1 - X^(p m)) = ∑_r (-1)^r X^(p P(r))`: the coefficient of
 `X ^ n` is `∑ (-1)^r [X^(n - p P(r))] A` over the integers `r` with `p P(r) ≤ n`. -/
@@ -109,7 +81,6 @@ private theorem generalizedTau_natCast_succ (k m : ℕ) :
 end ramanujanTau_succ_modEq_pentagonal_tau_five
 
 open ramanujanTau_succ_modEq_pentagonal_tau_five in
-set_option linter.unusedVariables false in
 /-- **Ramanujan's $\tau$ modulo $19$ via $\tau_5$.** Let $\tau = \tau_{24}$ be Ramanujan's tau
 function, where $\tau_k$ is the generalized tau function, and let $P(r) = r(3r - 1)/2$ for
 integers $r$. For every integer $n \ge 1$,
@@ -130,9 +101,10 @@ public theorem ramanujanTau_succ_modEq_pentagonal_tau_five (n : ℕ) (hn : 0 < n
         if 19 * pentagonal r ≤ n then
           (r.negOnePow : ℤ) * generalizedTau 5 (n - 19 * pentagonal r + 1)
         else 0 [ZMOD 19] := by
+  obtain ⟨m, rfl⟩ := Nat.exists_eq_succ_of_ne_zero hn.ne'
   have : Fact (Nat.Prime 19) := ⟨by norm_num⟩
   rw [show (24 : ℤ) = ((5 + 19 : ℕ) : ℤ) by rfl, generalizedTau_natCast_succ]
-  refine (coeff_pow_add_modEq 19 5 n).trans ?_
+  refine (coeff_pow_add_modEq 19 5 (m + 1)).trans ?_
   rw [coeff_mul_expand_pentagonalSeries]
   simp_rw [show (5 : ℤ) = ((5 : ℕ) : ℤ) by rfl, generalizedTau_natCast_succ]
   rfl
