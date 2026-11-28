@@ -163,7 +163,9 @@ def conjecture : Prop :=
 end
 
 open List
-open MetaMathlibExt (morphExtend morphIterate morphIterate_prefix morphIterate_succ_right)
+open MetaMathlibExt (morphExtend morphExtend_append morphExtend_nil morphExtend_singleton
+  morphIterate morphIterate_add morphIterate_prefix morphIterate_succ morphIterate_succ_right
+  morphIterate_zero)
 
 variable {α β : Type*}
 
@@ -184,30 +186,31 @@ private def code : Bool → List Sigma
 
 private abbrev piWord (w : List Bool) : List Sigma := w.flatMap code
 
+private theorem extend_eq_flatMap (f : α → List α) (w : List α) :
+    morphExtend f w = w.flatMap f := by
+  induction w with
+  | nil => rw [morphExtend_nil, List.flatMap_nil]
+  | cons x xs ih =>
+    change morphExtend f ([x] ++ xs) = _
+    rw [morphExtend_append, morphExtend_singleton, ih, List.flatMap_cons]
+
 private theorem iterate_append (f : α → List α) (n : Nat) (x y : List α) :
     morphIterate f n (x ++ y) = morphIterate f n x ++ morphIterate f n y := by
   induction n with
-  | zero => rfl
-  | succ n ih => simp [morphIterate, morphExtend, ih, List.flatMap_append]
+  | zero => simp only [morphIterate_zero]
+  | succ n ih => simp only [morphIterate_succ, ih, morphExtend_append]
 
 private theorem iterate_eq_extendIter (f : Morphism) (n : Nat) (w : List Sigma) :
     morphIterate f n w = extendIter f n w := by
   induction n with
-  | zero => rfl
-  | succ n ih => change (morphIterate f n w).flatMap f = extend f (extendIter f n w); rw [ih]; rfl
-
-private theorem iterate_add (f : α → List α) (m n : Nat) (w : List α) :
-    morphIterate f (m + n) w = morphIterate f n (morphIterate f m w) := by
-  induction n with
-  | zero => rfl
-  | succ n ih =>
-    change (morphIterate f (m + n) w).flatMap f = (morphIterate f n (morphIterate f m w)).flatMap f
-    rw [ih]
+  | zero => rw [morphIterate_zero]; rfl
+  | succ n ih => rw [morphIterate_succ, ih, extend_eq_flatMap]; rfl
 
 private theorem iterate_flatMap (f : α → List α) (n : Nat) (w : List α) :
     morphIterate f n w = w.flatMap (fun x => morphIterate f n [x]) := by
   induction w with
-  | nil => induction n <;> simp_all [morphIterate, morphExtend]
+  | nil => induction n <;> simp_all only [morphIterate_zero, morphIterate_succ, List.flatMap_nil,
+      morphExtend_nil]
   | cons x w ih =>
     change morphIterate f n ([x] ++ w) = _
     rw [iterate_append, ih, List.flatMap_cons]
@@ -222,29 +225,46 @@ private theorem code_mu (w : List Bool) : piWord (w.flatMap mu) = extend gamma (
 private theorem code_iterate (n : Nat) (w : List Bool) :
     piWord (morphIterate mu n w) = morphIterate gamma n (piWord w) := by
   induction n with
-  | zero => rfl
+  | zero => simp only [morphIterate_zero]
   | succ n ih =>
-    change piWord ((morphIterate mu n w).flatMap mu) =
-      (morphIterate gamma n (piWord w)).flatMap gamma
-    rw [code_mu, ih]
+    rw [morphIterate_succ mu, morphIterate_succ gamma, extend_eq_flatMap mu, code_mu, ih,
+      extend_eq_flatMap gamma]
     rfl
 
 private abbrev binaryPrefix (n : Nat) : List Bool := morphIterate mu n [false]
+private theorem binaryPrefix_succ (n : Nat) :
+    binaryPrefix (n + 1) = (binaryPrefix n).flatMap mu := by
+  simp only [binaryPrefix, morphIterate_succ, extend_eq_flatMap]
+
 private abbrev firstBlock (n : Nat) : List Sigma := piWord (binaryPrefix n)
 private abbrev secondBlock (n : Nat) : List Sigma := piWord (morphIterate mu n [true])
+
+private theorem firstBlock_zero : firstBlock 0 = [a, c] := by
+  simp only [firstBlock, binaryPrefix, morphIterate_zero]
+  rfl
+
+private theorem secondBlock_zero : secondBlock 0 = [a, b] := by
+  simp only [secondBlock, morphIterate_zero]
+  rfl
 
 private theorem firstBlock_succ (n : Nat) :
     firstBlock (n + 1) = firstBlock n ++ secondBlock n := by
   change piWord (binaryPrefix (n + 1)) = _
-  rw [show binaryPrefix (n + 1) = morphIterate mu n ([false] ++ [true]) from
-    morphIterate_succ_right ..]
+  rw [show binaryPrefix (n + 1) = morphIterate mu n ([false] ++ [true]) by
+    simp only [binaryPrefix, morphIterate_succ_right, morphExtend_singleton, mu,
+      List.singleton_append]]
   simp only [iterate_append, piWord, List.flatMap_append]
+
+private theorem firstBlock_one : firstBlock 1 = [a, c, a, b] := by
+  rw [firstBlock_succ, firstBlock_zero, secondBlock_zero]
+  rfl
 
 private theorem secondBlock_succ (n : Nat) :
     secondBlock (n + 1) = firstBlock n ++ firstBlock (n + 1) := by
   change piWord (morphIterate mu (n + 1) [true]) = _
   rw [show morphIterate mu (n + 1) [true] =
-    morphIterate mu n ([false] ++ ([false] ++ [true])) from morphIterate_succ_right ..]
+    morphIterate mu n ([false] ++ ([false] ++ [true])) by
+      simp only [morphIterate_succ_right, morphExtend_singleton, mu, List.singleton_append]]
   rw [firstBlock_succ]
   simp only [iterate_append, piWord, firstBlock, binaryPrefix, secondBlock, List.flatMap_append]
 
@@ -264,7 +284,7 @@ private theorem binaryPrefix_length (n : Nat) : n + 1 ≤ (binaryPrefix n).lengt
   | zero => decide
   | succ n ih =>
     have h := mu_length (binaryPrefix n)
-    change _ ≤ ((binaryPrefix n).flatMap mu).length
+    rw [binaryPrefix_succ]
     omega
 
 private theorem firstBlock_length (n : Nat) : n + 1 ≤ (firstBlock n).length := by
@@ -278,7 +298,8 @@ private theorem binaryPrefix_mono {m n : Nat} (h : m ≤ n) :
   | base => exact ⟨[], by simp⟩
   | succ n _ ih =>
     apply ih.trans
-    rw [show binaryPrefix (n + 1) = morphIterate mu n [false, true] from morphIterate_succ_right ..]
+    rw [show binaryPrefix (n + 1) = morphIterate mu n [false, true] by
+      simp only [binaryPrefix, morphIterate_succ_right, morphExtend_singleton, mu]]
     exact morphIterate_prefix (List.prefix_append [false] [true]) mu n
 
 private theorem firstBlock_mono {m n : Nat} (h : m ≤ n) :
@@ -294,7 +315,7 @@ private theorem firstBlock_get (n : Nat) {i : Nat} (h : i < (firstBlock n).lengt
   · exact (firstBlock_mono hni).getElem h
   · exact ((firstBlock_mono hin).getElem (firstBlock_length i)).symm
 
-private theorem word_zero : word 0 = a := rfl
+private theorem word_zero : word 0 = a := by simp [word, firstBlock_zero]
 
 private theorem occurs_of_prefix {w l r : List Sigma} {n : Nat}
     (h : l ++ w ++ r <+: firstBlock n) : OccursAt w word l.length := by
@@ -329,8 +350,8 @@ private theorem gamma_fixed : IsFixedPoint gamma word := by
   refine ⟨a, by decide, ?_, ?_⟩
   · intro L
     refine ⟨L + 1, ?_⟩
-    rw [← iterate_eq_extendIter, morphIterate_succ_right]
-    have h := (morphIterate_prefix (show [a, c] <+: [a].flatMap gamma by decide) gamma L).length_le
+    rw [← iterate_eq_extendIter, morphIterate_succ_right, morphExtend_singleton]
+    have h := (morphIterate_prefix (show [a, c] <+: gamma a by decide) gamma L).length_le
     rw [← show piWord [false] = [a, c] from rfl, ← code_iterate] at h
     exact le_trans (Nat.le_of_lt (firstBlock_length L)) h
   · intro n i
@@ -358,14 +379,15 @@ private theorem fixed_image_prefix {f : Morphism} (hf : IsFixedPoint f word)
 
 private theorem fixed_first {f : Morphism} (hf : IsFixedPoint f word) : (f a).head? = some a := by
   obtain ⟨d, hd, _, hs⟩ := hf
-  have he : d = a := hs 0 ⟨0, by change 0 < 1; decide⟩
+  have he : d = a := by
+    simpa [extendIter, word_zero] using hs 0 ⟨0, by change 0 < 1; decide⟩
   simpa [he] using hd
 
 -- The two-step palindrome recursion follows from the block recursions.
 private theorem firstBlock_palindromes (n : Nat) :
     ∃ p : List Sigma, firstBlock (n + 1) = [a, c, a] ++ p ∧ p.reverse = p ∧ p.head? = some b := by
   induction n using Nat.twoStepInduction with
-  | zero => exact ⟨[b], rfl, rfl, rfl⟩
+  | zero => exact ⟨[b], firstBlock_one, rfl, rfl⟩
   | one => exact ⟨[b, a, c, a, c, a, b], rfl, rfl, rfl⟩
   | more n ih₁ ih₂ =>
     obtain ⟨p, hp, hrp, hbp⟩ := ih₁
@@ -435,14 +457,14 @@ private theorem gamma_recurrent : IsUniformlyRecurrent word := by
   have hwR : w <:+: morphIterate gamma R [a] := by
     apply (occurs_in_firstBlock hk₀).trans
     suffices ht : firstBlock (k₀ + w.length) <+: morphIterate gamma R [a] from ht.isInfix
-    rw [show R = _ + 1 from rfl, morphIterate_succ_right]
+    rw [show R = _ + 1 from rfl, morphIterate_succ_right, morphExtend_singleton]
     rw [show firstBlock (k₀ + w.length) = morphIterate gamma (k₀ + w.length) [a, c] from
       code_iterate _ [false]]
-    exact morphIterate_prefix (show [a, c] <+: [a].flatMap gamma by decide) gamma _
+    exact morphIterate_prefix (show [a, c] <+: gamma a by decide) gamma _
   let Q := 3 + R
   have hall : ∀ x : Sigma, w <:+: morphIterate gamma Q [x] := by
     intro x
-    rw [show Q = 3 + R from rfl, iterate_add]
+    rw [show Q = 3 + R from rfl, morphIterate_add]
     apply hwR.trans
     apply iterate_infix
     exact (show ∀ y : Sigma, [a] <:+: morphIterate gamma 3 [y] by decide) x
@@ -460,7 +482,7 @@ private theorem gamma_recurrent : IsUniformlyRecurrent word := by
   have he : xs.flatMap g = firstBlock M := by
     change xs.flatMap g = piWord (morphIterate mu M [false])
     rw [code_iterate]
-    exact (iterate_add gamma (k + B) Q [a, c]).trans (iterate_flatMap gamma Q xs) |>.symm
+    exact (morphIterate_add gamma (k + B) Q [a, c]).trans (iterate_flatMap gamma Q xs) |>.symm
   have hg : k + B < (xs.flatMap g).length := by
     rw [he]
     have := firstBlock_length M
@@ -515,8 +537,10 @@ private theorem PrefixPreserving.map_prefix {f : Bool → List Bool} (hf : Prefi
   obtain ⟨m, hm⟩ := hf n
   exact ⟨m, (h.flatMap f).trans hm⟩
 
-private theorem mu_preserves : PrefixPreserving mu :=
-  fun n => ⟨n + 1, List.prefix_rfl⟩
+private theorem mu_preserves : PrefixPreserving mu := by
+  intro n
+  refine ⟨n + 1, ?_⟩
+  rw [binaryPrefix_succ]
 
 private theorem comp_preserves {f g : Bool → List Bool}
     (hf : PrefixPreserving f) (hg : PrefixPreserving g) :
@@ -532,12 +556,12 @@ private theorem prefixes_eq_of_length {f g : Bool → List Bool}
   obtain ⟨n, hn⟩ := hg 1
   have hp : f false ++ f true <+: binaryPrefix (max m n) :=
     by
-      simpa [binaryPrefix, morphIterate, morphExtend, mu] using
-        hm.trans (binaryPrefix_mono (Nat.le_max_left m n))
+      simpa [binaryPrefix, morphIterate_succ_right, morphExtend_singleton, morphIterate_zero, mu]
+        using hm.trans (binaryPrefix_mono (Nat.le_max_left m n))
   have hq : g false ++ g true <+: binaryPrefix (max m n) :=
     by
-      simpa [binaryPrefix, morphIterate, morphExtend, mu] using
-        hn.trans (binaryPrefix_mono (Nat.le_max_right m n))
+      simpa [binaryPrefix, morphIterate_succ_right, morphExtend_singleton, morphIterate_zero, mu]
+        using hn.trans (binaryPrefix_mono (Nat.le_max_right m n))
   have hfalse : f false = g false :=
     (List.prefix_of_prefix_length_le ((List.prefix_append _ _).trans hp)
       ((List.prefix_append _ _).trans hq) (le_of_eq (hlen false))).eq_of_length (hlen false)
@@ -605,11 +629,13 @@ private theorem discrepancy_prefix {w : List Bool} {n : Nat} (h : w <+: binaryPr
   | ind length ih =>
     cases n with
     | zero =>
-      have hh : w.length ≤ 1 := h.length_le
+      have hh : w.length ≤ 1 := by
+        simpa only [binaryPrefix, morphIterate_zero, List.length_singleton] using h.length_le
       exact (discrepancy_short (by omega)).trans (by norm_num)
     | succ n =>
       by_cases hw : w = []
       · norm_num [hw, discrepancy]
+      rw [binaryPrefix_succ] at h
       obtain ⟨l, r, hl, hwr, hr⟩ := flatMap_prefix_cut mu h
       have hmul := mu_length l
       have hlw : 2 * l.length ≤ w.length := by
@@ -651,8 +677,8 @@ private theorem discrepancy_preserving {f : Bool → List Bool} (hf : PrefixPres
   have hm : (n : ℝ) * |D| > 8 + 8 * |discrepancy (f false)| := (div_lt_iff₀ hd).mp hn
   let w := binaryPrefix (n + 1)
   have hcount : n ≤ w.count true := by
-    change n ≤ ((binaryPrefix n).flatMap mu).count true
-    rw [(count_mu _).2, count_bool_length]
+    change n ≤ (binaryPrefix (n + 1)).count true
+    rw [binaryPrefix_succ, (count_mu _).2, count_bool_length]
     have := binaryPrefix_length n
     omega
   have hcount' : (n : ℝ) ≤ w.count true := by exact_mod_cast hcount
@@ -785,7 +811,8 @@ private theorem mu_power_preserving {f : Bool → List Bool} (hf : PrefixPreserv
       rw [← h₁]
       simpa only [mu, List.flatMap_cons, List.append_nil, List.flatMap_nil] using
         congrFun hcom true
-    obtain ⟨m, hm⟩ := hf.map_prefix (w := [false]) (n := 0) List.prefix_rfl
+    obtain ⟨m, hm⟩ := hf.map_prefix (w := [false]) (n := 0) (by
+      simp only [binaryPrefix, morphIterate_zero, List.prefix_rfl])
     have hPpre : P <+: binaryPrefix (m + 1) := by
       simpa [P] using hm.trans (binaryPrefix_mono (Nat.le_succ m))
     by_cases hsmall : P.length ≤ 1
@@ -844,6 +871,7 @@ private theorem mu_power_preserving {f : Bool → List Bool} (hf : PrefixPreserv
     have hps : [true] <:+ P := ⟨P.dropLast, by
       rw [← hPlast]
       exact List.dropLast_append_getLast hn⟩
+    rw [binaryPrefix_succ] at hPpre
     obtain ⟨p, hp⟩ := absorb_mu_cut hPpre hps
     have hpP : p <+: P := by
       apply mu_reflect_prefix
@@ -866,8 +894,7 @@ private theorem mu_power_preserving {f : Bool → List Bool} (hf : PrefixPreserv
       intro n
       obtain ⟨l, hl⟩ := hf n
       refine ⟨l, mu_reflect_prefix ?_⟩
-      rw [List.flatMap_assoc]
-      change _ <+: binaryPrefix (l + 1)
+      rw [List.flatMap_assoc, ← binaryPrefix_succ]
       simpa only [← hfg] using hl.trans (binaryPrefix_mono (Nat.le_succ l))
     have hgne : g false ≠ [] := by
       intro hnil
@@ -878,7 +905,7 @@ private theorem mu_power_preserving {f : Bool → List Bool} (hf : PrefixPreserv
       have hpos := List.length_pos_iff.mpr hn
       omega
     obtain ⟨k, hk⟩ := ih (g false).length hsmall' hg hgne rfl
-    exact ⟨k + 1, fun x => by rw [hfg, hk]; rfl⟩
+    exact ⟨k + 1, fun x => by rw [hfg, hk, morphIterate_succ, extend_eq_flatMap]⟩
 
 -- The letter a marks the start of each ac or ab block.
 private theorem code_boundary {l r : List Sigma} {u : List Bool}
@@ -1189,9 +1216,7 @@ private theorem binaryPrefix_coprime (n : Nat) :
   induction n with
   | zero => decide
   | succ n ih =>
-    change Nat.Coprime (((binaryPrefix n).flatMap mu).count false)
-      (((binaryPrefix n).flatMap mu).count true)
-    rw [(count_mu _).1, (count_mu _).2,
+    rw [binaryPrefix_succ, (count_mu _).1, (count_mu _).2,
       show (binaryPrefix n).count false + 2 * (binaryPrefix n).count true =
           (binaryPrefix n).count true + ((binaryPrefix n).count false +
             (binaryPrefix n).count true) by omega,
@@ -1219,8 +1244,10 @@ private theorem block_coprime (n : Nat) :
 private theorem mu_iter_reflect_prefix {u v : List Bool} (k : Nat)
     (h : morphIterate mu k u <+: morphIterate mu k v) : u <+: v := by
   induction k with
-  | zero => exact h
-  | succ k ih => exact ih (mu_reflect_prefix h)
+  | zero => simpa only [morphIterate_zero] using h
+  | succ k ih =>
+    simp only [morphIterate_succ, extend_eq_flatMap] at h
+    exact ih (mu_reflect_prefix h)
 
 private theorem first_second_incomparable (k : Nat) :
     ¬ (firstBlock k <+: secondBlock k ∨ secondBlock k <+: firstBlock k) := by
@@ -1237,8 +1264,8 @@ private theorem firstBlock_last (k : Nat) : [a, c, a, b] <:+ firstBlock (k + 1) 
   let x := (binaryPrefix k).getLast hn
   have he : (binaryPrefix k).dropLast ++ [x] = binaryPrefix k :=
     List.dropLast_append_getLast hn
-  change [a, c, a, b] <:+ (((binaryPrefix k).flatMap mu).flatMap code)
-  rw [← he, List.flatMap_append, List.flatMap_append]
+  change [a, c, a, b] <:+ (binaryPrefix (k + 1)).flatMap code
+  rw [binaryPrefix_succ, ← he, List.flatMap_append, List.flatMap_append]
   apply List.IsSuffix.trans _ (List.suffix_append _ _)
   cases x <;> decide
 
@@ -1254,6 +1281,7 @@ private theorem block_mirror (n : Nat) :
     rfl
   · cases n with
     | zero =>
+      rw [firstBlock_one] at hp
       have e : p = [b] := List.append_cancel_left (as := [a, c, a]) hp.symm
       rw [e]
       decide
@@ -1311,8 +1339,9 @@ private theorem cut_commutes {U p : List Sigma} {n : Nat}
       (List.prefix_append _ _) (by rw [List.length_reverse]; omega)
   have hUlong : 4 ≤ U.length := by
     by_contra hsmall
-    have hs : [a, c, a, b] <+: firstBlock (n + 1) :=
-      firstBlock_mono (Nat.succ_le_succ (Nat.zero_le n))
+    have hs : [a, c, a, b] <+: firstBlock (n + 1) := by
+      rw [← firstBlock_one]
+      exact firstBlock_mono (Nat.succ_le_succ (Nat.zero_le n))
     have hpre' := List.prefix_of_prefix_length_le hpre hs (by
       change U.length ≤ 4
       omega)
@@ -1350,8 +1379,8 @@ private theorem cut_commutes {U p : List Sigma} {n : Nat}
 private theorem block_zero_identity {f : Morphism} (ha : (f a).head? = some a)
     (hc : f a ++ f c = firstBlock 0) (hb : f a ++ f b = secondBlock 0) :
     IsIdentityMorphism f := by
-  change f a ++ f c = [a, c] at hc
-  change f a ++ f b = [a, b] at hb
+  rw [firstBlock_zero] at hc
+  rw [secondBlock_zero] at hb
   obtain ⟨s, hs⟩ := List.head?_eq_some_iff.mp ha
   rw [hs] at hc hb
   have h₁ : s ++ f c = [c] := List.cons.inj hc |>.2

@@ -58,6 +58,14 @@ public def IsSubstitution {A : Type*} (η : A → List A) : Prop :=
   IsNonErasing η ∧
     ∃ a, Filter.Tendsto (fun k => (morphIterate η k [a]).length) Filter.atTop Filter.atTop
 
+/-- **A non-erasing letter map with a growing letter is a substitution.** Suppose each letter
+has a nonempty image under $\eta$, and one letter $a$ has iterated images whose lengths tend to
+infinity. Then $\eta$ is a substitution. -/
+public theorem IsSubstitution.of_nonempty_images {A : Type*} {η : A → List A} {a : A}
+    (hne : ∀ b, η b ≠ [])
+    (ha : Filter.Tendsto (fun k => (morphIterate η k [a]).length) Filter.atTop Filter.atTop) :
+    IsSubstitution η := ⟨isNonErasing_iff.mpr hne, a, ha⟩
+
 /-- **Substitutions are non-erasing.** Every substitution $\eta$ in the sense of Labbé and
 Lepšová is non-erasing: $\eta(a)$ is a nonempty word for every letter $a$.
 
@@ -77,6 +85,13 @@ public def IsAdmissibleSequence {A : Type*} (η : A → List A) (s : ℕ → Lis
     Prop :=
   ∀ i < k, (s i).1 ++ [(s i).2] <+: η (s (i + 1)).2
 
+/-- **Adjacent prefixes give an admissible sequence.** For each $i < k$, suppose the word
+$m_i a_i$ is a prefix of $\eta(a_{i+1})$. Then the pairs $(m_i,a_i)$ for $0 \le i \le k$ are
+admissible for $\eta$. -/
+public theorem IsAdmissibleSequence.of_prefixes {A : Type*} {η : A → List A}
+    {s : ℕ → List A × A} {k : ℕ} (h : ∀ i < k, (s i).1 ++ [(s i).2] <+: η (s (i + 1)).2) :
+    IsAdmissibleSequence η s k := h
+
 /-- **Admissible sequences starting from a letter.** Let $\eta$ map each letter of an alphabet
 $A$ to a finite word over $A$, and let $a \in A$. A finite sequence $(m_i, a_i)_{0 \le i \le k}$
 of pairs, each made of a finite word $m_i$ over $A$ and a letter $a_i \in A$, is
@@ -88,6 +103,13 @@ Source: Labbé and Lepšová, *Dumont-Thomas Complement Numeration Systems for �
 public def IsLetterAdmissibleSequence {A : Type*} (η : A → List A) (a : A)
     (s : ℕ → List A × A) (k : ℕ) : Prop :=
   IsAdmissibleSequence η s k ∧ (s k).1 ++ [(s k).2] <+: η a
+
+/-- **The top prefix of a letter-admissible sequence.** An admissible sequence of pairs
+$(m_i,a_i)$ for $0 \le i \le k$ is $a$-admissible if its last pair gives a prefix
+$m_k a_k$ of $\eta(a)$. -/
+public theorem IsLetterAdmissibleSequence.of_top_prefix {A : Type*} {η : A → List A} {a : A}
+    {s : ℕ → List A × A} {k : ℕ} (hs : IsAdmissibleSequence η s k)
+    (h : (s k).1 ++ [(s k).2] <+: η a) : IsLetterAdmissibleSequence η a s k := ⟨hs, h⟩
 
 /-- **One-term sequences are admissible.** Let $\eta$ send each letter of an alphabet $A$ to a
 finite word over $A$. Every one-term sequence $(m_0, a_0)$, with $m_0$ a finite word over $A$
@@ -213,16 +235,16 @@ private theorem iterate_split {A : Type*} (η : A → List A) {w u v : List A}
     (h : morphExtend η w = u ++ v) (n : ℕ) :
     morphIterate η (n + 1) w = morphIterate η n u ++ morphIterate η n v := by
   induction n with
-  | zero => exact h
+  | zero => simpa only [morphIterate_succ_right, morphIterate_zero] using h
   | succ n ih =>
-    rw [morphIterate, ih, morphExtend_append]
-    rfl
+    rw [morphIterate_succ η (n + 1), ih, morphExtend_append, ← morphIterate_succ,
+      ← morphIterate_succ]
 
 private theorem iterate_append {A : Type*} (η : A → List A) (k : ℕ) (u v : List A) :
     morphIterate η k (u ++ v) = morphIterate η k u ++ morphIterate η k v := by
   induction k with
-  | zero => rfl
-  | succ k ih => simp only [morphIterate, ih, morphExtend_append]
+  | zero => simp only [morphIterate_zero]
+  | succ k ih => simp only [morphIterate_succ, ih, morphExtend_append]
 
 -- The suffix after the selected letter absorbs the unvisited part of each image.
 private theorem read_with_suffix {A : Type*} (η : A → List A) (s : ℕ → List A × A)
@@ -232,7 +254,7 @@ private theorem read_with_suffix {A : Type*} (η : A → List A) (s : ℕ → Li
         ∑ j ∈ Finset.range p, (morphIterate η j (s j).1).length]? = some a ∧
       substitutionAutomaton η x ((List.range p).reverse.map fun j => (s j).1.length) = some a := by
   induction p generalizing x suffix with
-  | zero => exact ⟨x, by simp [morphIterate, substitutionAutomaton]⟩
+  | zero => exact ⟨x, by simp [morphIterate_zero, substitutionAutomaton]⟩
   | succ p ih =>
     obtain ⟨hadm, rest, hrest⟩ := hs (Nat.zero_lt_succ p)
     simp only [Nat.add_one_sub_one] at hadm hrest
@@ -243,8 +265,9 @@ private theorem read_with_suffix {A : Type*} (η : A → List A) (s : ℕ → Li
       simp
     have hsplit : morphExtend η (x :: suffix) =
         (s p).1 ++ (s p).2 :: (rest ++ morphExtend η suffix) := by
-      change η x ++ morphExtend η suffix = _
-      simp [himage]
+      change morphExtend η ([x] ++ suffix) = _
+      rw [morphExtend_append, morphExtend_singleton, himage, List.append_assoc]
+      rfl
     rw [iterate_split η hsplit p, Finset.sum_range_succ,
       List.getElem?_append_right (by omega), Nat.add_sub_cancel,
       List.range_succ, List.reverse_append]
@@ -489,6 +512,21 @@ public def IsTwoSidedPeriodicPoint {A : Type*} (η : A → List A) (u : ℤ → 
         (morphIterate η p ((List.range m).reverse.map fun j : ℕ => u (-1 - (j : ℤ)))).length -
           1 - i]'(by omega) = u (-1 - (i : ℤ))
 
+/-- **Two-sided periodicity from finite prefixes and suffixes.** Let $p \ge 1$. If the $p$-fold
+image of each finite prefix on the right of the origin agrees with the corresponding prefix of
+$u$, and the $p$-fold image of each finite suffix on the left agrees with the corresponding
+suffix of $u$, then $u$ is a two-sided periodic point with period $p$. -/
+public theorem IsTwoSidedPeriodicPoint.of_prefix_suffix {A : Type*} {η : A → List A}
+    {u : ℤ → A} {p : ℕ} (hp : 1 ≤ p)
+    (hprefix : ∀ n i (hi : i < (morphIterate η p ((List.range n).map fun j : ℕ => u j)).length),
+      (morphIterate η p ((List.range n).map fun j : ℕ => u j))[i] = u i)
+    (hsuffix : ∀ m i (hi : i < (morphIterate η p
+        ((List.range m).reverse.map fun j : ℕ => u (-1 - (j : ℤ)))).length),
+      (morphIterate η p ((List.range m).reverse.map fun j : ℕ => u (-1 - (j : ℤ))))[
+        (morphIterate η p ((List.range m).reverse.map fun j : ℕ => u (-1 - (j : ℤ)))).length -
+          1 - i]'(by omega) = u (-1 - (i : ℤ))) :
+    IsTwoSidedPeriodicPoint η u p := ⟨hp, hprefix, hsuffix⟩
+
 /-- **Periods of two-sided periodic points are positive.** Let $\eta$ send each letter of an
 alphabet $A$ to a finite word over $A$. If a two-sided word $u : \mathbb{Z} \to A$ is a
 periodic point of $\eta$ with period $p$, then $p \ge 1$.
@@ -516,6 +554,18 @@ public def IsPeriodicPointWithGrowingSeed {A : Type*} (η : A → List A) (u : �
   IsSubstitution η ∧ IsLeast {q | IsTwoSidedPeriodicPoint η u q} p ∧
     Filter.Tendsto (fun k => (morphIterate η k [u 0]).length) Filter.atTop Filter.atTop ∧
     Filter.Tendsto (fun k => (morphIterate η k [u (-1)]).length) Filter.atTop Filter.atTop
+
+/-- **A least period and two growing seed letters.** If $\eta$ is a substitution, $p$ is a
+period of the two-sided word $u$ no larger than any other period, and the iterated image lengths
+of $u_0$ and $u_{-1}$ both tend to infinity, then $u$ is a periodic point with growing seed and
+least period $p$. -/
+public theorem IsPeriodicPointWithGrowingSeed.of_least_period {A : Type*} {η : A → List A}
+    {u : ℤ → A} {p : ℕ} (hη : IsSubstitution η) (hp : IsTwoSidedPeriodicPoint η u p)
+    (hle : ∀ q, IsTwoSidedPeriodicPoint η u q → p ≤ q)
+    (h₀ : Filter.Tendsto (fun k => (morphIterate η k [u 0]).length) Filter.atTop Filter.atTop)
+    (hneg : Filter.Tendsto (fun k => (morphIterate η k [u (-1)]).length)
+      Filter.atTop Filter.atTop) :
+    IsPeriodicPointWithGrowingSeed η u p := ⟨hη, ⟨hp, fun q hq => hle q hq⟩, h₀, hneg⟩
 
 /-- **Periodic points with growing seed are two-sided periodic points.** Let $\eta$ map each
 letter of an alphabet $A$ to a finite word over $A$, let $u = (u_i)_{i \in \mathbb{Z}}$ be a
@@ -567,6 +617,20 @@ public def IsDumontThomasRep {A : Type*} (η : A → List A) (u : ℤ → A) (p 
           (fun t : ℕ => u ((t : ℤ) - (morphIterate η k [u (-1)]).length)) =
         ((List.range k).reverse.map fun j => morphIterate η j (s j).1).flatten ∧
       w = 1 :: (List.range k).reverse.map fun j => (s j).1.length)
+
+/-- **A Dumont–Thomas representation of a positive position.** Suppose $N \ge 1$, $p$ divides
+$k$, and $(m_i,a_i)_{0 \le i < k}$ is a $u_0$-admissible sequence whose leading $p$ words do not
+all vanish. If the iterated images of the words in descending order of depth concatenate to the
+length-$N$ right prefix of $u$, then prefixing the lengths $|m_{k-1}|,\ldots,|m_0|$ by $0$
+gives a representation of $N$. -/
+public theorem IsDumontThomasRep.of_pos {A : Type*} {η : A → List A} {u : ℤ → A} {p N k : ℕ}
+    {s : ℕ → List A × A} (hN : 1 ≤ N) (hk : p ∣ k)
+    (hs : IsLetterAdmissibleSequence η (u 0) s (k - 1))
+    (htop : ((List.range p).map fun t => (s (k - 1 - t)).1).flatten ≠ [])
+    (hpre : (List.range N).map (fun j : ℕ => u j) =
+      ((List.range k).reverse.map fun j => morphIterate η j (s j).1).flatten) :
+    IsDumontThomasRep η u p N (0 :: (List.range k).reverse.map fun j => (s j).1.length) :=
+  Or.inr (Or.inr (Or.inl ⟨N, k, s, hN, rfl, hk, hs, htop, hpre, rfl⟩))
 
 /-- **A Dumont–Thomas representation of zero.** For every map $\eta$ sending each letter of an
 alphabet $A$ to a finite word over $A$, every two-sided word $u = (u_i)_{i \in \mathbb{Z}}$ over
@@ -698,22 +762,24 @@ namespace seedAutomaton_neutral_padding
 private theorem iterate_singleton_ne_nil {A : Type*} {η : A → List A} (hη : IsNonErasing η)
     (n : ℕ) (a : A) : morphIterate η n [a] ≠ [] := by
   induction n with
-  | zero => simp [morphIterate]
+  | zero => simp [morphIterate_zero]
   | succ n ih =>
     obtain ⟨b, rest, hrest⟩ := List.exists_cons_of_ne_nil ih
-    rw [morphIterate, hrest]
-    change η b ++ morphExtend η rest ≠ []
-    simp [hη b]
+    rw [morphIterate_succ, hrest]
+    change morphExtend η ([b] ++ rest) ≠ []
+    rw [morphExtend_append, morphExtend_singleton]
+    simp [isNonErasing_iff.mp hη b]
 
 -- The first block in the iterated image is obtained by taking digit zero first.
 private theorem run_replicate_zero {A : Type*} {η : A → List A} (hη : IsNonErasing η)
     (n : ℕ) (a : A) :
     substitutionAutomaton η a (List.replicate n 0) = (morphIterate η n [a])[0]? := by
   induction n generalizing a with
-  | zero => rfl
+  | zero => simp only [List.replicate_zero, substitutionAutomaton_nil, morphIterate_zero,
+      List.getElem?_cons_zero]
   | succ n ih =>
-    obtain ⟨b, rest, ha⟩ := List.exists_cons_of_ne_nil (hη a)
-    have hsplit : morphExtend η [a] = [b] ++ rest := by simp [morphExtend, ha]
+    obtain ⟨b, rest, ha⟩ := List.exists_cons_of_ne_nil (isNonErasing_iff.mp hη a)
+    have hsplit : morphExtend η [a] = [b] ++ rest := by rw [morphExtend_singleton, ha]; rfl
     rw [List.replicate_succ, substitutionAutomaton_cons, ha, List.getElem?_cons_zero,
       Option.bind_some, ih, morphIterate_getElem_eq_substitutionAutomaton_tail.iterate_split η
         hsplit]
@@ -725,12 +791,13 @@ private theorem run_lastLetterDigits {A : Type*} {η : A → List A} (hη : IsNo
     (n : ℕ) (a : A) :
     substitutionAutomaton η a (lastLetterDigits η n a) = (morphIterate η n [a]).getLast? := by
   induction n generalizing a with
-  | zero => rfl
+  | zero => rw [morphIterate_zero]; rfl
   | succ n ih =>
-    let b := (η a).getLast (hη a)
-    have hb : (η a).getLast? = some b := List.getLast?_eq_some_getLast (hη a)
+    have hne := isNonErasing_iff.mp hη a
+    let b := (η a).getLast hne
+    have hb : (η a).getLast? = some b := List.getLast?_eq_some_getLast hne
     obtain ⟨pre, hpre⟩ := List.getLast?_eq_some_iff.mp hb
-    have hsplit : morphExtend η [a] = pre ++ [b] := by simpa [morphExtend] using hpre
+    have hsplit : morphExtend η [a] = pre ++ [b] := (morphExtend_singleton η a).trans hpre
     simp only [lastLetterDigits_succ_of_getLast? η n a b hb, substitutionAutomaton_cons,
       ← List.getLast?_eq_getElem?, hb, Option.bind_some, ih,
       morphIterate_getElem_eq_substitutionAutomaton_tail.iterate_split η hsplit,
@@ -805,7 +872,7 @@ private theorem expansion_prefix {A : Type*} (η : A → List A) (s : ℕ → Li
   | zero =>
     simpa only [Nat.zero_add, List.range_one, List.reverse_singleton, List.map_singleton,
       List.flatten_singleton, morphIterate_succ_right, morphExtend_singleton,
-      morphIterate.eq_1] using hs.2
+      morphIterate_zero] using hs.2
   | succ k ih =>
     have hshort : IsLetterAdmissibleSequence η (s (k + 1)).2 s k :=
       ⟨fun i hi => hs.1 i (Nat.lt_succ_of_lt hi), hs.1 k k.lt_succ_self⟩
@@ -822,7 +889,7 @@ private theorem periodic_iterate_eq {A : Type*} {η : A → List A} {u : ℤ →
       (List.range (morphIterate η n [u 0]).length).map (fun j : ℕ => u j) := by
   obtain ⟨m, rfl⟩ := hn
   induction m with
-  | zero => simp [morphIterate.eq_1, List.range_one]
+  | zero => simp [morphIterate_zero, List.range_one]
   | succ m ih =>
     rw [Nat.mul_succ, morphIterate_add, ih]
     apply List.ext_getElem
@@ -959,7 +1026,7 @@ public theorem dumontThomasRep_quotient_remainder_pos {A : Type*} (η : A → Li
       exact List.length_pos_iff.mpr (List.flatten_ne_nil_iff.mpr
         ⟨_, List.mem_map.mpr ⟨j, List.mem_reverse.mpr (List.mem_range.mpr hj), rfl⟩,
           List.length_pos_iff.mp (hc.trans_le hlen)⟩)
-    refine ⟨Or.inr (Or.inr (Or.inl ⟨q, b, t, hqpos, rfl, hd, ht, htop', hwpre, rfl⟩)), ?_⟩
+    refine ⟨IsDumontThomasRep.of_pos hqpos hd ht htop' hwpre, ?_⟩
     refine ⟨fun i hi => hs.1 i (by omega), ?_⟩
     simpa only [Nat.sub_add_cancel hp, hlet] using hs.1 (p - 1) (by dsimp [b] at hb; omega)
   refine ⟨?_, htrunc⟩

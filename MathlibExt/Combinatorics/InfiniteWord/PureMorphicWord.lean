@@ -23,8 +23,8 @@ Finite words are modelled by `List A`; infinite words by `Nat → A`.
 
 ## References
 
-* The proofs of `morphIterate_succ_right` and `morphIterate_prefix` were moved from the private
-  lemmas `iterate_succ_right` and `iterate_prefix` in
+* The proofs of `morphIterate_succ_right`, `morphIterate_prefix`, and `morphIterate_add` were
+  moved from the private lemmas `iterate_succ_right`, `iterate_prefix`, and `iterate_add` in
   `MathlibExt.Combinatorics.PalindromicRecurrentOutsideP`.
 -/
 
@@ -43,6 +43,10 @@ Source: concept `jis_sem_817d955b6393d48d72476d2d`, clause `word_morphism`; stat
 `jis_e5dacb15b7f36a3e2d33683c`, `jis_f0ae0eecd29e48e7e5a45717`. -/
 public def morphExtend {A : Type*} (f : A → List A) (w : List A) : List A :=
   w.flatMap f
+
+/-- **The image of the empty word.** Extending any letter map by concatenation sends the
+empty word to the empty word. -/
+public theorem morphExtend_nil {A : Type*} (f : A → List A) : morphExtend f [] = [] := rfl
 
 /-- **The image of a one-letter word.** For every letter map $f$ and letter $a$, extending $f$
 by concatenation sends the one-letter word $[a]$ to $f(a)$. -/
@@ -63,6 +67,16 @@ public def morphIterate {A : Type*} (f : A → List A) : Nat → List A → List
   | 0, w => w
   | n + 1, w => morphExtend f (morphIterate f n w)
 
+/-- **The zeroth letter-map iterate.** Applying a letter map zero times leaves every finite
+word unchanged. -/
+public theorem morphIterate_zero {A : Type*} (f : A → List A) (w : List A) :
+    morphIterate f 0 w = w := rfl
+
+/-- **One further step of a letter-map iterate.** The $(n+1)$-st iterate on a finite word $w$
+is the letter map extended by concatenation applied to the $n$-th iterate on $w$. -/
+public theorem morphIterate_succ {A : Type*} (f : A → List A) (n : ℕ) (w : List A) :
+    morphIterate f (n + 1) w = morphExtend f (morphIterate f n w) := rfl
+
 /-- **Applying the first step of a letter-map iterate.** For any letter map $f$, finite word
 $w$ and natural number $n$, the $(n+1)$-st iterate on $w$ equals the $n$-th iterate on the
 one-step image of $w$. -/
@@ -82,8 +96,7 @@ public theorem morphIterate_add {A : Type*} (f : A → List A) (m n : ℕ) (w : 
   induction n with
   | zero => rfl
   | succ n ih =>
-    change morphExtend f (morphIterate f (m + n) w) =
-      morphExtend f (morphIterate f n (morphIterate f m w))
+    change (morphIterate f (m + n) w).flatMap f = (morphIterate f n (morphIterate f m w)).flatMap f
     rw [ih]
 
 /-- **Iterated letter maps preserve prefixes.** If $u$ is a prefix of $v$, then for any letter
@@ -143,6 +156,11 @@ Source: concept `jis_sem_817d955b6393d48d72476d2d`, clause `non_erasing`; statem
 `jis_e5dacb15b7f36a3e2d33683c`, `jis_f0ae0eecd29e48e7e5a45717`. -/
 public def IsNonErasing {A : Type*} (f : A → List A) : Prop :=
   ∀ a : A, f a ≠ []
+
+/-- **Non-erasing letter maps send letters to nonempty words.** A letter map is non-erasing
+if and only if the image of every letter is nonempty. -/
+public theorem isNonErasing_iff {A : Type*} {f : A → List A} :
+    IsNonErasing f ↔ ∀ a, f a ≠ [] := Iff.rfl
 
 /-- **Prolongable letter maps.** Let $f$ send each letter of an alphabet $A$ to a finite word
 over $A$, extended to finite words by concatenation, with iterates $f^n$ (where $f^0$ is the

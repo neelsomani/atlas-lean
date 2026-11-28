@@ -22,7 +22,8 @@ private def path : ℕ → List Bool × Bool
   | _ + 1 => ([true], false)
 
 private theorem letterMap_isSubstitution : IsSubstitution letterMap := by
-  refine ⟨fun a => by cases a <;> decide, false, Filter.tendsto_atTop_atTop.mpr ?_⟩
+  refine IsSubstitution.of_nonempty_images (a := false) (fun a => by cases a <;> decide)
+    (Filter.tendsto_atTop_atTop.mpr ?_)
   intro n
   refine ⟨n, fun k hk => ?_⟩
   have hlen (a : Bool) : (letterMap a).length = 2 := by cases a <;> rfl
@@ -35,7 +36,8 @@ namespace MetaMathlibExt.substitutionAutomaton_admissibleSequence.Tests
 open morphIterate_getElem_eq_substitutionAutomaton_tail
 
 private theorem path_isLetterAdmissible : IsLetterAdmissibleSequence letterMap false path 1 := by
-  refine ⟨fun i hi => ?_, ⟨[], rfl⟩⟩
+  refine IsLetterAdmissibleSequence.of_top_prefix
+    (IsAdmissibleSequence.of_prefixes (fun i hi => ?_)) ⟨[], rfl⟩
   obtain rfl : i = 0 := by omega
   exact ⟨[false], rfl⟩
 
@@ -48,7 +50,7 @@ example : (morphIterate letterMap 2 [false])[2]? =
 -- A single pair can have an empty word. Its digit still makes a transition.
 example : substitutionAutomaton letterMap false [0] = some true := by
   have hadm : IsLetterAdmissibleSequence letterMap false path 0 :=
-    ⟨isAdmissibleSequence_zero _ _, ⟨[false], rfl⟩⟩
+    IsLetterAdmissibleSequence.of_top_prefix (isAdmissibleSequence_zero _ _) ⟨[false], rfl⟩
   exact substitutionAutomaton_admissibleSequence
     letterMap letterMap_isSubstitution 1 (by decide) false path hadm 0 (by decide)
 
@@ -73,7 +75,7 @@ example : (∑ j ∈ Finset.range (0 + 1), (morphIterate letterMap j [true]).len
 example : (∑ j ∈ Finset.range (2 + 1), (morphIterate letterMap j (path j).1).length) <
     (morphIterate letterMap 2 [true, false]).length := by
   apply admissibleSequence_weightedLength_lt letterMap letterMap_isSubstitution path 2
-  intro i hi
+  refine IsAdmissibleSequence.of_prefixes (fun i hi => ?_)
   have h : i = 0 ∨ i = 1 := by omega
   rcases h with rfl | rfl
   · exact ⟨[false], rfl⟩
@@ -99,9 +101,9 @@ private def onePair' : ℕ → List Bool × Bool := fun _ => ([true], false)
 -- At depth zero the prefix is nonempty and the two tails need not agree.
 example : onePair 0 = onePair' 0 ∧ onePair 1 ≠ onePair' 1 := by
   have hs : IsLetterAdmissibleSequence letterMap false onePair 0 :=
-    ⟨isAdmissibleSequence_zero _ _, ⟨[], rfl⟩⟩
+    IsLetterAdmissibleSequence.of_top_prefix (isAdmissibleSequence_zero _ _) ⟨[], rfl⟩
   have hs' : IsLetterAdmissibleSequence letterMap false onePair' 0 :=
-    ⟨isAdmissibleSequence_zero _ _, ⟨[], rfl⟩⟩
+    IsLetterAdmissibleSequence.of_top_prefix (isAdmissibleSequence_zero _ _) ⟨[], rfl⟩
   have hw : (∑ j ∈ Finset.range (0 + 1), (morphIterate letterMap j (onePair j).1).length) = 1 ∧
       (∑ j ∈ Finset.range (0 + 1), (morphIterate letterMap j (onePair' j).1).length) = 1 := by
     decide
@@ -115,11 +117,13 @@ private def pathWithTail (i : ℕ) : List Bool × Bool :=
 -- The top letter is false; the lower letter is true. The second tail is different.
 example : path 0 = pathWithTail 0 ∧ path 1 = pathWithTail 1 ∧ path 2 ≠ pathWithTail 2 := by
   have hs : IsLetterAdmissibleSequence letterMap false path 1 := by
-    refine ⟨fun i hi => ?_, ⟨[], rfl⟩⟩
+    refine IsLetterAdmissibleSequence.of_top_prefix
+      (IsAdmissibleSequence.of_prefixes (fun i hi => ?_)) ⟨[], rfl⟩
     obtain rfl : i = 0 := by omega
     exact ⟨[false], rfl⟩
   have hs' : IsLetterAdmissibleSequence letterMap false pathWithTail 1 := by
-    refine ⟨fun i hi => ?_, ⟨[], rfl⟩⟩
+    refine IsLetterAdmissibleSequence.of_top_prefix
+      (IsAdmissibleSequence.of_prefixes (fun i hi => ?_)) ⟨[], rfl⟩
     obtain rfl : i = 0 := by omega
     exact ⟨[false], rfl⟩
   have hw : (∑ j ∈ Finset.range (1 + 1), (morphIterate letterMap j (path j).1).length) = 2 ∧
@@ -143,10 +147,13 @@ private theorem unitPoint : IsPeriodicPointWithGrowingSeed double (fun _ => ()) 
     have hlen (a : Unit) : (double a).length = 2 := rfl
     simpa [morphIterate_length_of_uniform hlen] using hk.trans (Nat.lt_two_pow_self (n := k)).le
   have hper : IsTwoSidedPeriodicPoint double (fun _ => ()) 1 :=
-    ⟨le_rfl, fun _ _ _ => Subsingleton.elim _ _, fun _ _ _ => Subsingleton.elim _ _⟩
-  refine ⟨⟨fun _ => List.cons_ne_nil _ _, (), hgrow⟩, ⟨hper, ?_⟩, hgrow, hgrow⟩
+    IsTwoSidedPeriodicPoint.of_prefix_suffix le_rfl (fun _ _ _ => Subsingleton.elim _ _)
+      (fun _ _ _ => Subsingleton.elim _ _)
+  refine IsPeriodicPointWithGrowingSeed.of_least_period
+    (IsSubstitution.of_nonempty_images (fun _ => List.cons_ne_nil _ _) hgrow)
+    hper ?_ hgrow hgrow
   intro q hq
-  exact (show IsTwoSidedPeriodicPoint double (fun _ => ()) q from hq).one_le
+  exact hq.one_le
 
 -- Insert two padding blocks after either sign, keeping the nonempty suffix.
 example : seedAutomaton double () () [0, 0, 0, 1] = some () ∧
@@ -182,7 +189,8 @@ private def largerBottom : ℕ → List Bool × Bool := fun _ => ([true], false)
 -- The top digit decides even though the bottom digits compare the other way.
 example : ([0, 1] : List ℕ) < [1, 0] := by
   have hs : IsLetterAdmissibleSequence letterMap false smallerTop 1 := by
-    refine ⟨fun i hi => ?_, ⟨[false], rfl⟩⟩
+    refine IsLetterAdmissibleSequence.of_top_prefix
+      (IsAdmissibleSequence.of_prefixes (fun i hi => ?_)) ⟨[false], rfl⟩
     obtain rfl : i = 0 := by omega
     exact ⟨[], rfl⟩
   exact (tail_injective_and_strictMono letterMap letterMap_isSubstitution 2 (by decide)
@@ -192,7 +200,8 @@ example : ([0, 1] : List ℕ) < [1, 0] := by
 example : (∑ j ∈ Finset.range 2, (morphIterate letterMap j (path j).1).length) <
     ∑ j ∈ Finset.range 2, (morphIterate letterMap j (largerBottom j).1).length := by
   have hs : IsLetterAdmissibleSequence letterMap false largerBottom 1 :=
-    ⟨fun _ _ => ⟨[], rfl⟩, ⟨[], rfl⟩⟩
+    IsLetterAdmissibleSequence.of_top_prefix
+      (IsAdmissibleSequence.of_prefixes (fun _ _ => ⟨[], rfl⟩)) ⟨[], rfl⟩
   exact (tail_injective_and_strictMono letterMap letterMap_isSubstitution 2 (by decide)
     false path largerBottom path_isLetterAdmissible hs).2.mpr (by decide)
 
@@ -200,9 +209,9 @@ example : (∑ j ∈ Finset.range 2, (morphIterate letterMap j (path j).1).lengt
 example : (∑ j ∈ Finset.range 1, (morphIterate letterMap j (path j).1).length) =
     ∑ j ∈ Finset.range 1, (morphIterate letterMap j (path 0).1).length := by
   have hs : IsLetterAdmissibleSequence letterMap false path 0 :=
-    ⟨isAdmissibleSequence_zero _ _, ⟨[false], rfl⟩⟩
+    IsLetterAdmissibleSequence.of_top_prefix (isAdmissibleSequence_zero _ _) ⟨[false], rfl⟩
   have hs' : IsLetterAdmissibleSequence letterMap false (fun _ => path 0) 0 :=
-    ⟨isAdmissibleSequence_zero _ _, ⟨[false], rfl⟩⟩
+    IsLetterAdmissibleSequence.of_top_prefix (isAdmissibleSequence_zero _ _) ⟨[false], rfl⟩
   exact (tail_injective_and_strictMono letterMap letterMap_isSubstitution 1 (by decide)
     false path (fun _ => path 0) hs hs').1.mpr rfl
 
@@ -222,21 +231,22 @@ private def fivePath : ℕ → List Bool × Bool
 
 private theorem onePath_admissible :
     IsLetterAdmissibleSequence ternary (alternating 0) onePath 0 :=
-  ⟨isAdmissibleSequence_zero _ _, ⟨[false], rfl⟩⟩
+  IsLetterAdmissibleSequence.of_top_prefix (isAdmissibleSequence_zero _ _) ⟨[false], rfl⟩
 
 private theorem one_rep : IsDumontThomasRep ternary alternating 1 1 [0, 1] :=
-  Or.inr (Or.inr (Or.inl
-    ⟨1, 1, onePath, by decide, rfl, dvd_refl _, onePath_admissible, by decide, by decide, rfl⟩))
+  IsDumontThomasRep.of_pos (p := 1) (N := 1) (k := 1) (s := onePath)
+    (by decide) (dvd_refl _) onePath_admissible (by decide) (by decide)
 
 -- Odd-length images preserve the alternating word on both sides of the origin. For N = 5,
 -- the first digit skips a block of three; the last skips two letters in the image of `true`.
 example : IsDumontThomasRep ternary alternating 1 5 [0, 1, 2] := by
   have hs : IsLetterAdmissibleSequence ternary (alternating 0) fivePath 1 := by
-    refine ⟨fun i hi => ?_, ⟨[false], rfl⟩⟩
+    refine IsLetterAdmissibleSequence.of_top_prefix
+      (IsAdmissibleSequence.of_prefixes (fun i hi => ?_)) ⟨[false], rfl⟩
     obtain rfl : i = 0 := by omega
     exact ⟨[], rfl⟩
-  exact Or.inr (Or.inr (Or.inl
-    ⟨5, 2, fivePath, by decide, rfl, by decide, hs, by decide, by decide, rfl⟩))
+  exact IsDumontThomasRep.of_pos (p := 1) (N := 5) (k := 2) (s := fivePath)
+    (by decide) (by decide) hs (by decide) (by decide)
 
 -- Independent positive-quotient check: the weighted positions are q = 1 and r = 2;
 -- the quotient seed is `true`, not the original seed `false`.
@@ -245,7 +255,8 @@ example : (∑ j ∈ Finset.range (2 - 1), (morphIterate ternary j (fivePath (j 
     (morphIterate ternary 1 [alternating 1])[2]? = some (alternating 5) ∧
     IsDumontThomasRep ternary alternating 1 1 [0, 1] ∧
     IsLetterAdmissibleSequence ternary (alternating 1) fivePath 0 :=
-  ⟨by decide, by decide, by decide, one_rep, isAdmissibleSequence_zero _ _, ⟨[], rfl⟩⟩
+  ⟨by decide, by decide, by decide, one_rep,
+    IsLetterAdmissibleSequence.of_top_prefix (isAdmissibleSequence_zero _ _) ⟨[], rfl⟩⟩
 
 -- Independent zero-quotient check: there are no retained digits and r = 1.
 example : (∑ j ∈ Finset.range (1 - 1), (morphIterate ternary j (onePath (j + 1)).1).length) = 0 ∧
@@ -254,6 +265,10 @@ example : (∑ j ∈ Finset.range (1 - 1), (morphIterate ternary j (onePath (j +
     IsDumontThomasRep ternary alternating 1 0 [0] ∧
     IsLetterAdmissibleSequence ternary (alternating 0) onePath 0 :=
   ⟨by decide, by decide, by decide, isDumontThomasRep_zero _ _ _, onePath_admissible⟩
+
+-- Compute the empty word and zero iterate independently of their public rewrite rules.
+example : morphExtend ternary [] = [] ∧ morphIterate ternary 0 [true, false] = [true, false] :=
+  by decide
 
 -- Compute the singleton extension and both sides of iterate composition independently.
 example : morphExtend ternary [true] = [true, false, true] ∧
@@ -267,7 +282,7 @@ open seedAutomaton_neutral_padding.Tests (double unitPoint)
 example : IsDumontThomasRep double (fun _ => ()) 1 0 [0] := by
   let s : ℕ → List Unit × Unit := fun _ => ([()], ())
   have hs : IsLetterAdmissibleSequence double () s 0 :=
-    ⟨isAdmissibleSequence_zero _ _, ⟨[], rfl⟩⟩
+    IsLetterAdmissibleSequence.of_top_prefix (isAdmissibleSequence_zero _ _) ⟨[], rfl⟩
   exact (dumontThomasRep_quotient_remainder_pos (η := double) (u := fun _ => ())
     (p := 1) (hu := unitPoint) (N := 1) (k := 1) (s := s) (hN := by decide)
     (hk := dvd_refl _) (hs := hs) (htop := by decide) (hpre := by decide)).2.1
