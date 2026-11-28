@@ -24,8 +24,9 @@ valued in `ℕ∞` so that an infinite representation set (possible only with a 
 as `⊤` rather than collapsing to `0`, and the predicate `IsGenFrobeniusNumber a s g` saying that
 `g = max {m ∈ ℤ | d(m; a) ≤ s}` is the generalized Frobenius number `g(a; s)`.
 For three positive generators and a natural target, a bounded search over two coefficients gives
-an exact count. Given a positive generator, checking the integers immediately above a candidate
-cutoff in a window of that generator's length suffices to certify its maximality.
+an exact count. At level $s$, a candidate $g$ must itself have at most $s$ representations.
+If $a_i$ is a positive generator, checking that every integer in $(g, g + a_i]$ has more than
+$s$ representations rules out every larger integer as a candidate.
 
 ## References
 
