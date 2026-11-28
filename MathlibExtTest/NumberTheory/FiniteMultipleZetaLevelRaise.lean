@@ -65,6 +65,15 @@ example : finiteMZVColored 2 2 (fun _ : Fin 1 => 1) oddColor = 0 ∧
   simp only [finiteMZVColored_eq_sum_ite]
   decide +kernel
 
+-- At the same prime, a map enabled at the nonunit residue `0 mod 2` can give a nonzero value.
+-- The only positive tuple is `(1)`, so its lift at `2 mod 4` contributes for color `1`, not `3`.
+example :
+    finiteMZVColored 2 2 ![1] (fun a => if a = 0 then some ![1] else none) = 1 ∧
+    finiteMZVColored 2 4 ![1] (fun a => if a = 2 then some ![1] else none) = 1 ∧
+    finiteMZVColored 2 4 ![1] (fun a => if a = 2 then some ![3] else none) = 0 := by
+  simp only [finiteMZVColored_eq_sum_ite]
+  decide +kernel
+
 -- Client of the eventual theorem at the same two levels.
 example : ∃ (n : ℕ) (q : Fin n → ℚ) (s : Fin n → ℕ) (k' : (i : Fin n) → Fin (s i) → ℕ)
     (c' : (i : Fin n) → ZMod 4 → Option (Fin (s i) → ZMod 4)),

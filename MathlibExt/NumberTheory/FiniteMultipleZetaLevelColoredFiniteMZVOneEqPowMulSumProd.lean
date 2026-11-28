@@ -77,8 +77,9 @@ $\zeta^c_{\mathcal{A},N}(k)_p \in \mathbb{Z}/p\mathbb{Z}$ is the colored finite 
 sum $\zeta^{\alpha}_{p,N}(k)$ when $c(p \bmod N) = \alpha$ is a tuple, and $0$ when
 $c(p \bmod N) = \emptyset$.
 
-Color maps are taken on all of $\mathbb{Z}/N\mathbb{Z}$; only their values at units matter for all
-but finitely many $p$.
+Color maps are taken on all of $\mathbb{Z}/N\mathbb{Z}$. When $N > 0$, the residue of $p$ is a
+unit for all but finitely many primes $p$, so only values at units affect the eventual prime
+components.
 
 Source: Seki, *Regular Primes, Non-Wieferich Primes, and Finite Multiple Zeta Values of
 Level N*, INTEGERS 24 (2024), Article A22, Definition 2.1 (finite multiple zeta values of
