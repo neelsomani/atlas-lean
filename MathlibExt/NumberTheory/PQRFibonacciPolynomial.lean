@@ -16,8 +16,22 @@ import Mathlib.Tactic.Ring
 /-!
 # The (p,q)-analogue of the r-Fibonacci polynomials
 
-We define the polynomials using the division-free (p,q)-binomial coefficients and
-prove their first recurrence over a commutative semiring.
+We use division-free $(p,q)$-binomial coefficients to prove both recurrences for the
+$(p,q)$-analogue of the $r$-Fibonacci polynomials. Here $r$, $n$ and $m$ are natural numbers
+with $1 \le r \le n$, and $x$, $y$, $p$ and $q$ lie in a commutative semiring. Neither
+recurrence requires the $(p,q)$-factorials to be invertible.
+
+## References
+
+* Sadjia Abbad and Hacène Belbachir, *The r-Fibonacci Polynomial and Its Companion Sequences
+  Linked with Some Classical Sequences*, INTEGERS 25 (2025), Article A38, pp. 1–20,
+  Section 3, Equations (2)–(3), Definition 1, and Theorem 2, Equations (4)–(5).
+* Roberto B. Corcino, *On p, q-Binomial Coefficients*, INTEGERS 8 (2008), Article A29,
+  pp. 1–16, Theorem 1, Equations (13)–(14). We derive the swapped Pascal rule by induction
+  rather than using the quotient formula.
+
+The proof of both recurrences uses the zero-padded sum argument from the original ATLAS proof
+of `MetaMathlibExt.pqRFibonacci_succ_eq_left` in this module.
 -/
 
 namespace MetaMathlibExt
@@ -153,6 +167,35 @@ private theorem pqBinomial_eq_zero_of_lt (p q : R) {n k : ℕ} (h : n < k) :
     | succ k =>
       rw [pqBinomial_succ_succ, ih (by omega), ih (by omega), mul_zero, mul_zero, add_zero]
 
+-- The two Pascal rules commute: expand the preceding row using the other rule on each side.
+private theorem pqBinomial_succ_succ_swap (p q : R) (n k : ℕ) :
+    pqBinomial p q (n + 1) (k + 1) =
+      q ^ (n - k) * pqBinomial p q n k + p ^ (k + 1) * pqBinomial p q n (k + 1) := by
+  induction n generalizing k with
+  | zero =>
+    rw [pqBinomial_succ_succ]
+    cases k <;> simp [pqBinomial_zero_right, pqBinomial_zero_succ]
+  | succ n ih =>
+    by_cases h : n + 1 ≤ k
+    · rw [pqBinomial_succ_succ, pqBinomial_eq_zero_of_lt p q (by omega : n + 1 < k + 1),
+        Nat.sub_eq_zero_of_le h]
+      simp
+    · cases k with
+      | zero =>
+        rw [pqBinomial_succ_succ p q (n + 1) 0]
+        simp only [Nat.sub_zero, pqBinomial_zero_right, mul_one]
+        conv_lhs => rw [ih 0]
+        conv_rhs => rw [pqBinomial_succ_succ p q n 0]
+        simp only [Nat.sub_zero, pqBinomial_zero_right, mul_one, pow_succ]
+        ring
+      | succ k =>
+        rw [pqBinomial_succ_succ p q (n + 1) (k + 1), Nat.add_sub_add_right]
+        conv_lhs => rw [ih k, ih (k + 1)]
+        conv_rhs => rw [pqBinomial_succ_succ p q n k, pqBinomial_succ_succ p q n (k + 1)]
+        rw [show n - k = n - (k + 1) + 1 by omega]
+        simp only [pow_succ]
+        ring
+
 -- The summand with x-degree `d` and y-degree `k`, before imposing the range of the sum.
 private def pqRFibonacciWeight (x y p q : R) (m d k : ℕ) : R :=
   p ^ (d + 1).choose 2 * q ^ ((k + 1).choose 2 + m * k.choose 2) *
@@ -185,9 +228,9 @@ private theorem pqRFibonacci_eq_sum_term (r : ℕ) (x y p q : R) (m n b : ℕ) (
         intro k _ hk
         exact ite_eq_right (fun hk' => hk ((hmem k).mpr hk'))
 
-private theorem pqRFibonacciTerm_zero_right (r : ℕ) (x y p q : R) (m n : ℕ) (hn : 0 < n) :
+private theorem pqRFibonacciTerm_zero_right (r : ℕ) (x y p q b : R) (m n : ℕ) (hn : 0 < n) :
     pqRFibonacciTerm r x y p q m (n + 1) 0 =
-      p * x * pqRFibonacciTerm r (p * x) (q * y) p q m n 0 := by
+      p * x * pqRFibonacciTerm r (p * x) (b * y) p q m n 0 := by
   obtain ⟨n, rfl⟩ := Nat.exists_eq_succ_of_ne_zero (Nat.ne_of_gt hn)
   simp only [pqRFibonacciTerm, Nat.mul_zero, Nat.zero_lt_succ, ite_true, Nat.succ_sub_one,
     Nat.sub_zero, pqRFibonacciWeight, Nat.add_zero, pqBinomial_zero_right,
@@ -197,18 +240,27 @@ private theorem pqRFibonacciTerm_zero_right (r : ℕ) (x y p q : R) (m n : ℕ) 
   simp only [mul_pow, pow_add, pow_one]
   ring
 
-private theorem pqRFibonacciWeight_succ_right (x y p q : R) (m d k : ℕ) :
+-- The same sum argument works for either choice of the Pascal weights `a` and `b`.
+section
+
+variable {p q a b : R}
+  (hpascal : ∀ n k : ℕ, pqBinomial p q (n + 1) (k + 1) =
+    a ^ (n - k) * pqBinomial p q n k + b ^ (k + 1) * pqBinomial p q n (k + 1))
+
+include hpascal
+
+private theorem pqRFibonacciWeight_succ_right (x y : R) (m d k : ℕ) :
     pqRFibonacciWeight x y p q m d (k + 1) =
-      (if d = 0 then 0 else p * x * pqRFibonacciWeight (p * x) (q * y) p q m (d - 1) (k + 1)) +
-        q * y * pqRFibonacciWeight (p * x) (q ^ (m + 1) * y) p q m d k := by
+      (if d = 0 then 0 else p * x * pqRFibonacciWeight (p * x) (b * y) p q m (d - 1) (k + 1)) +
+        q * y * pqRFibonacciWeight (a * x) (q ^ (m + 1) * y) p q m d k := by
   have hq : (k + 1 + 1).choose 2 + m * (k + 1).choose 2 =
       ((k + 1).choose 2 + m * k.choose 2) + (m + 1) * k + 1 := by
     rw [Nat.choose_succ_succ (k + 1) 1, Nat.choose_one_right, Nat.choose_succ_succ k 1,
       Nat.choose_one_right]
     ring
-  rw [add_comm _ (q * y * pqRFibonacciWeight (p * x) (q ^ (m + 1) * y) p q m d k)]
+  rw [add_comm _ (q * y * pqRFibonacciWeight (a * x) (q ^ (m + 1) * y) p q m d k)]
   unfold pqRFibonacciWeight
-  rw [show d + (k + 1) = d + k + 1 by omega, pqBinomial_succ_succ, Nat.add_sub_cancel]
+  rw [show d + (k + 1) = d + k + 1 by omega, hpascal, Nat.add_sub_cancel]
   simp only [mul_add, add_mul]
   congr 1
   · rw [hq]
@@ -224,10 +276,10 @@ private theorem pqRFibonacciWeight_succ_right (x y p q : R) (m d k : ℕ) :
       simp only [mul_pow, pow_add, pow_one]
       ring
 
-private theorem pqRFibonacciTerm_succ_right (r : ℕ) (x y p q : R) (m n k : ℕ) :
+private theorem pqRFibonacciTerm_succ_right (r : ℕ) (x y : R) (m n k : ℕ) :
     pqRFibonacciTerm r x y p q m (n + 1) (k + 1) =
-      p * x * pqRFibonacciTerm r (p * x) (q * y) p q m n (k + 1) +
-        q * y * pqRFibonacciTerm r (p * x) (q ^ (m + 1) * y) p q m (n - r) k := by
+      p * x * pqRFibonacciTerm r (p * x) (b * y) p q m n (k + 1) +
+        q * y * pqRFibonacciTerm r (a * x) (q ^ (m + 1) * y) p q m (n - r) k := by
   have hstep : (r + 1) * (k + 1) = (r + 1) * k + r + 1 := by
     rw [Nat.mul_succ, Nat.add_assoc]
   unfold pqRFibonacciTerm
@@ -235,7 +287,7 @@ private theorem pqRFibonacciTerm_succ_right (r : ℕ) (x y p q : R) (m n k : ℕ
   · rw [ite_eq_left (show (r + 1) * (k + 1) < n + 1 by omega),
       ite_eq_left (show (r + 1) * k < n - r by omega), Nat.add_sub_cancel,
       show n - r - 1 - (r + 1) * k = n - (r + 1) * (k + 1) by omega,
-      pqRFibonacciWeight_succ_right]
+      pqRFibonacciWeight_succ_right hpascal]
     congr 1
     by_cases h' : (r + 1) * (k + 1) < n
     · rw [ite_eq_left h', ite_eq_right (by omega),
@@ -244,6 +296,20 @@ private theorem pqRFibonacciTerm_succ_right (r : ℕ) (x y p q : R) (m n k : ℕ
   · rw [ite_eq_right (show ¬(r + 1) * (k + 1) < n + 1 by omega),
       ite_eq_right (show ¬(r + 1) * (k + 1) < n by omega),
       ite_eq_right (show ¬(r + 1) * k < n - r by omega), mul_zero, mul_zero, add_zero]
+
+private theorem pqRFibonacci_succ_of_pascal {r n : ℕ} (hn : 0 < n) (x y : R) (m : ℕ) :
+    pqRFibonacci r x y p q m (n + 1) =
+      p * x * pqRFibonacci r (p * x) (b * y) p q m n +
+        q * y * pqRFibonacci r (a * x) (q ^ (m + 1) * y) p q m (n - r) := by
+  rw [pqRFibonacci_eq_sum_term r x y p q m (n + 1) (n + 1) le_rfl,
+    pqRFibonacci_eq_sum_term r (p * x) (b * y) p q m n (n + 1) (Nat.le_succ n),
+    pqRFibonacci_eq_sum_term r (a * x) (q ^ (m + 1) * y) p q m (n - r) n (Nat.sub_le n r),
+    Finset.sum_range_succ', Finset.sum_range_succ']
+  simp_rw [pqRFibonacciTerm_succ_right hpascal, pqRFibonacciTerm_zero_right r x y p q b m n hn,
+    Finset.sum_add_distrib, ← Finset.mul_sum, mul_add]
+  rw [add_right_comm]
+
+end
 
 /-- **First recurrence for the $(p,q)$-analogue of the $r$-Fibonacci polynomial.** Let $R$ be a
 commutative semiring, let $r \ge 1$, $n \ge r$ and $m$ be natural numbers and let
@@ -259,12 +325,22 @@ public theorem pqRFibonacci_succ_eq_left {R : Type*} [CommSemiring R] {r n : ℕ
     pqRFibonacci r x y p q m (n + 1)
       = p * x * pqRFibonacci r (p * x) (q * y) p q m n
         + q * y * pqRFibonacci r (p * x) (q ^ (m + 1) * y) p q m (n - r) := by
-  rw [pqRFibonacci_eq_sum_term r x y p q m (n + 1) (n + 1) le_rfl,
-    pqRFibonacci_eq_sum_term r (p * x) (q * y) p q m n (n + 1) (Nat.le_succ n),
-    pqRFibonacci_eq_sum_term r (p * x) (q ^ (m + 1) * y) p q m (n - r) n (Nat.sub_le n r),
-    Finset.sum_range_succ', Finset.sum_range_succ']
-  simp_rw [pqRFibonacciTerm_succ_right, pqRFibonacciTerm_zero_right r x y p q m n (by omega),
-    Finset.sum_add_distrib, ← Finset.mul_sum, mul_add]
-  rw [add_right_comm]
+  exact pqRFibonacci_succ_of_pascal (pqBinomial_succ_succ p q) (by omega) x y m
+
+/-- **Second recurrence for the $(p,q)$-analogue of the $r$-Fibonacci polynomial.** Let $R$ be a
+commutative semiring, let $r \ge 1$, $n \ge r$ and $m$ be natural numbers and let
+$x, y, p, q \in R$. Write $U_j(x, y)$ for $U^{(r)}_j(x, y, p, q, m)$, the $(p,q)$-analogue of the
+$r$-Fibonacci polynomial with $r$, $p$, $q$ and $m$ fixed. Then
+$$U_{n+1}(x, y) = p x \, U_n(p x, p y) + q y \, U_{n-r}(q x, q^{m+1} y).$$
+
+Source: Abbad and Belbachir, *The r-Fibonacci Polynomial and Its Companion
+Sequences Linked with Some Classical Sequences*, INTEGERS 25 (2025),
+Article A38, Theorem 2, Equation (5) (`integers-2025-A38-thm-2`). -/
+public theorem pqRFibonacci_succ_eq_right {R : Type*} [CommSemiring R] {r n : ℕ}
+    (hr : 1 ≤ r) (hn : r ≤ n) (x y p q : R) (m : ℕ) :
+    pqRFibonacci r x y p q m (n + 1)
+      = p * x * pqRFibonacci r (p * x) (p * y) p q m n
+        + q * y * pqRFibonacci r (q * x) (q ^ (m + 1) * y) p q m (n - r) := by
+  exact pqRFibonacci_succ_of_pascal (pqBinomial_succ_succ_swap p q) (by omega) x y m
 
 end MetaMathlibExt
