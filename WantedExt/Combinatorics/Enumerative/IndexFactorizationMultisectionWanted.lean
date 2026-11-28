@@ -15,6 +15,7 @@ public import Mathlib.NumberTheory.LSeries.Basic
 public import Mathlib.NumberTheory.Padics.PadicVal.Defs
 public import MathlibExt.Analysis.Series.ThreeAdicMultiples
 public import MathlibExt.Analysis.Series.TwoAdicDoubleMultisection
+public import MathlibExt.Analysis.Series.TwoAdicEulerDissection
 public import MathlibExt.Analysis.Series.TwoAdicMultiples
 public import MathlibExt.Analysis.Series.TwoAdicNonmultiples
 public import MathlibExt.Analysis.Series.TwoAdicTruncatedRegroup
@@ -118,22 +119,6 @@ public theorem_wanted lambert_sigma_eq_tsum_twoAdic (q : ℂ) (hq : ‖q‖ < 1)
               (by rw [norm_pow]; exact pow_lt_one₀ (norm_nonneg q) hq (by positivity))⟩
             - 4 * lambertG ⟨q ^ 2 ^ (x.1 + x.2 + 1),
               (by rw [norm_pow]; exact pow_lt_one₀ (norm_nonneg q) hq (by positivity))⟩)
-
-/-- **2-adic dissection of the Euler function.** For every complex number $q$ with $|q| < 1$,
-with the infinite q-Pochhammer symbol $(a; r)_\infty = \prod_{k \ge 0} (1 - a r^k)$, the
-unconditional infinite product over $j \ge 0$ satisfies
-$$\prod_{j \ge 0} \left( \frac{(q^{2^j}; q^{2^{j+1}})_\infty}
-{(q^{2^{j+1}}; q^{2^{j+1}})_\infty} \right)^{2^j} = (q; q)_\infty.$$
-
-Source: Christophe Vignat and Michael Milgram, *Curious Multisection Identities by
-Index Factorization*, Journal of Integer Sequences 27 (2024), Article 24.5.5,
-Proposition 19, first display (`jis-2024-24.5.5-prop-19`). -/
-public theorem_wanted tprod_qPochhammer_twoAdic (q : ℂ) (hq : ‖q‖ < 1) :
-    ∏' j : ℕ, (QPochhammer.qPochhammerInf (q ^ 2 ^ j) (q ^ 2 ^ (j + 1))
-          (by rw [norm_pow]; exact pow_lt_one₀ (norm_nonneg q) hq (by positivity))
-        / QPochhammer.qPochhammerInf (q ^ 2 ^ (j + 1)) (q ^ 2 ^ (j + 1))
-          (by rw [norm_pow]; exact pow_lt_one₀ (norm_nonneg q) hq (by positivity))) ^ 2 ^ j
-      = QPochhammer.qPochhammerInf q q hq
 
 /-- **Parametric 2-adic dissection of the Euler function for real q.** Let $q$ and $p$ be real
 numbers with $0 < q < 1$, and write $(a; r)_\infty = \prod_{k \ge 0} (1 - a r^k)$ for real $a$
