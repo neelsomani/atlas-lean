@@ -101,6 +101,9 @@ $n\,g_{k,l}(n) \equiv \tilde g_l(n) \pmod{p}$ in $\mathbb{Z}_{(p)}$; and (b) $g_
 the localization $\mathbb{Z}_{(p)}$, that is, has nonnegative $p$-adic valuation, if and only if
 $\tilde g_l(p) = 0$ or $\tilde g_l(p) = p$.
 
+The paper introduces the Göbel recurrence for $k \ge 2$ in Section 1, but Lemma 6 is stated for
+odd primes. At $p = 3$, this statement uses the same initial value and recurrence at $k = 1$.
+
 Source: Yuh Kobayashi and Shin-ichiro Seki, *A Note on Non-Integrality of the (k, l)-Göbel
 Sequences*, Journal of Integer Sequences 29 (2026), Article 26.3.8, Lemma 6. -/
 public theorem gobelSequence_half_pred_congruent_residue_walk
