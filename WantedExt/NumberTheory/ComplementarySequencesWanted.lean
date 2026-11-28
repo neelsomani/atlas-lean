@@ -20,6 +20,7 @@ public import MathlibExt.NumberTheory.ComplementarySequences
 public import MathlibExt.NumberTheory.ComplementarySequencesInterleaveNear
 public import MathlibExt.NumberTheory.ComplementarySequencesNthNonCenteredPolygonal
 public import MathlibExt.NumberTheory.ComplementarySequencesInterleaveFar
+public import MathlibExt.NumberTheory.ComplementarySequencesPyramidal
 public import MathlibExt.NumberTheory.NonSecondPentagonal
 
 /-!
@@ -94,23 +95,6 @@ public theorem_wanted nthNonValue_secondPolygonal (k : ℕ) (hk : 5 < k) (n : �
     let s := Nat.sqrt (2 * n / (k - 2))
     nthNonValue (fun j => ((k - 2) * j ^ 2 + (k - 4) * j) / 2) n =
       if (k - 2) * s * (s + 1) < 2 * n + 4 * s then n + s else n + s - 1
-
-/-- **Formula for the non-pyramidal numbers.** Let $3 \le k \le 8$, and for $j \ge 1$ let
-$P(k, j) = j (j + 1) ((k - 2) j - (k - 5))/6$ be the $k$-gonal pyramidal numbers. For every
-integer $n \ge 1$, put $s = \lfloor \sqrt[3]{6n/(k - 2)} \rfloor$. Then the $n$-th positive
-integer that is not of the form $P(k, j)$ with $j \ge 1$ equals $n + s + 1$ if
-$6n \ge s^3 (k - 2) + 3 s^2 (k - 1) + s (2k - 1) + 6$; otherwise it equals $n + s - 1$ if
-$6n \le s (s - 1) (s (k - 2) + k + 1)$, and $n + s$ if not.
-
-Source: Chai Wah Wu, *Algorithms for Complementary Sequences*, INTEGERS 25 (2025),
-Article A95, Theorem 9, Equation (6). -/
-public theorem_wanted nthNonValue_pyramidal (k : ℕ) (hk : 3 ≤ k) (hk' : k ≤ 8) (n : ℕ)
-    (hn : 1 ≤ n) :
-    let s := Nat.nthRoot 3 (6 * n / (k - 2))
-    nthNonValue (fun j => j * (j + 1) * ((k - 2) * j + 5 - k) / 6) n =
-      if s ^ 3 * (k - 2) + 3 * s ^ 2 * (k - 1) + s * (2 * k - 1) + 6 ≤ 6 * n then n + s + 1
-      else if 6 * n ≤ s * (s - 1) * (s * (k - 2) + k + 1) then n + s - 1
-      else n + s
 
 /-- **Two-case formula for the non-pyramidal numbers when $k \le 5$.** Let $3 \le k \le 5$, and
 for $j \ge 1$ let $P(k, j) = j (j + 1) ((k - 2) j - (k - 5))/6$ be the $k$-gonal pyramidal
