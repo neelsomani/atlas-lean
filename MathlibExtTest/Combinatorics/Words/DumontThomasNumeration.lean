@@ -287,4 +287,161 @@ example : IsDumontThomasRep double (fun _ => ()) 1 0 [0] := by
     (p := 1) (hu := unitPoint) (N := 1) (k := 1) (s := s) (hN := by decide)
     (hk := dvd_refl _) (hs := hs) (htop := by decide) (hpre := by decide)).2.1
 
+-- One application flips the phase of the alternating word; two restore it.
+private def flipped (a : Bool) : List Bool := [!a, a, !a]
+
+private def segment (z : ℤ) (n : ℕ) : List Bool :=
+  (List.range n).map fun j : ℕ => alternating (z + (j : ℤ))
+
+private theorem segment_add (z : ℤ) (m n : ℕ) :
+    segment z (m + n) = segment z m ++ segment (z + (m : ℤ)) n := by
+  simp only [segment, List.range_add, List.map_append, List.map_map, Function.comp_def,
+    Nat.cast_add, add_assoc]
+
+private theorem alternating_succ (z : ℤ) : alternating (z + 1) = !(alternating z) := by
+  by_cases h : z % 2 = 1
+  · have h' : (z + 1) % 2 ≠ 1 := by omega
+    simp [alternating, h, h']
+  · have h' : (z + 1) % 2 = 1 := by omega
+    simp [alternating, h, h']
+
+private theorem flipped_extend_segment (z : ℤ) (n : ℕ) :
+    morphExtend flipped (segment z n) = segment (z + 1) (3 * n) := by
+  induction n with
+  | zero => simp [segment, morphExtend_nil]
+  | succ n ih =>
+    rw [segment_add z n 1, Nat.mul_succ, segment_add (z + 1) (3 * n) 3,
+      morphExtend_append, ih]
+    congr 1
+    have hphase : alternating (z + 1 + (↑(3 * n) : ℤ)) = !(alternating (z + (n : ℤ))) := by
+      rw [← alternating_succ]
+      have hmod : (z + 1 + (↑(3 * n) : ℤ)) % 2 = (z + (n : ℤ) + 1) % 2 := by
+        push_cast
+        omega
+      simp only [alternating, hmod]
+    have htriple (x : ℤ) : segment x 3 = [alternating x, !alternating x, alternating x] := by
+      have htwo : x + 2 = (x + 1) + 1 := by omega
+      simp only [segment, show List.range 3 = [0, 1, 2] by decide, List.map_cons, List.map_nil,
+        Nat.cast_zero, Nat.cast_one, Nat.cast_ofNat, add_zero, htwo, alternating_succ, Bool.not_not]
+    rw [show segment (z + (n : ℤ)) 1 = [alternating (z + (n : ℤ))] by
+      simp [segment, List.range_one], morphExtend_singleton, htriple, hphase]
+    simp only [flipped, Bool.not_not]
+
+private theorem flipped_second_iterate_segment (z : ℤ) (n : ℕ) :
+    morphIterate flipped 2 (segment z n) = segment z (9 * n) := by
+  rw [morphIterate_succ flipped 1, morphIterate_succ flipped 0, morphIterate_zero,
+    flipped_extend_segment, flipped_extend_segment, show 3 * (3 * n) = 9 * n by omega]
+  apply List.map_congr_left
+  intro j _
+  have hmod : (z + 1 + 1 + (j : ℤ)) % 2 = (z + (j : ℤ)) % 2 := by omega
+  simp only [alternating, hmod]
+
+private theorem flipped_grows (a : Bool) :
+    Filter.Tendsto (fun k => (morphIterate flipped k [a]).length) Filter.atTop Filter.atTop := by
+  refine Filter.tendsto_atTop_atTop.mpr fun n => ⟨n, fun k hk => ?_⟩
+  have hpow : 2 ^ k ≤ 3 ^ k := Nat.pow_le_pow_left (by decide) _
+  simpa [morphIterate_length_of_uniform (k := 3) (f := flipped) (fun _ => rfl)] using
+    hk.trans ((Nat.lt_two_pow_self (n := k)).le.trans hpow)
+
+private theorem flipped_period_two : IsPeriodicPointWithGrowingSeed flipped alternating 2 := by
+  have hsub : IsSubstitution flipped :=
+    IsSubstitution.of_nonempty_images (fun _ => List.cons_ne_nil _ _) (flipped_grows false)
+  have hper : IsTwoSidedPeriodicPoint flipped alternating 2 := by
+    refine IsTwoSidedPeriodicPoint.of_prefix_suffix (by decide) ?_ ?_
+    · intro n i hi
+      have hw := flipped_second_iterate_segment 0 n
+      simp only [segment, zero_add] at hw
+      simp only [hw, List.getElem_map, List.getElem_range]
+    · intro n i hi
+      have hleft : ((List.range n).reverse.map fun j : ℕ => alternating (-1 - (j : ℤ))) =
+          segment (-(n : ℤ)) n := by
+        apply List.ext_getElem
+        · simp [segment]
+        · intro j _ hj
+          have hj' : j < n := by simpa [segment] using hj
+          simp only [segment, List.getElem_map, List.getElem_reverse, List.length_range,
+            List.getElem_range]
+          congr 1
+          omega
+      have hw := (congrArg (morphIterate flipped 2) hleft).trans
+        (flipped_second_iterate_segment (-(n : ℤ)) n)
+      have hlen := congrArg List.length hw
+      simp only [segment, List.length_map, List.length_range] at hlen
+      have hi' : i < 9 * n := hlen ▸ hi
+      simp only [hw, segment, List.length_map, List.length_range, List.getElem_map,
+        List.getElem_range]
+      have hmod : (-(n : ℤ) + (↑(9 * n - 1 - i) : ℤ)) % 2 = (-1 - (i : ℤ)) % 2 := by
+        omega
+      simp only [alternating, hmod]
+  refine IsPeriodicPointWithGrowingSeed.of_least_period hsub hper ?_
+    (flipped_grows _) (flipped_grows _)
+  intro q hq
+  by_contra! h
+  obtain rfl : q = 1 := by have := hq.one_le; omega
+  -- At period one, the digit 0 would have to return to the seed, but it flips it.
+  have hp : IsPeriodicPointWithGrowingSeed flipped alternating 1 :=
+    IsPeriodicPointWithGrowingSeed.of_least_period hsub hq (fun _ hq' => hq'.one_le)
+      (flipped_grows _) (flipped_grows _)
+  have hpad := (seedAutomaton_neutral_padding flipped alternating 1 hp [] 1).1 (by decide)
+  exact (by decide : seedAutomaton flipped (alternating (-1)) (alternating 0) [0, 0] ≠
+    seedAutomaton flipped (alternating (-1)) (alternating 0) [0]) hpad
+
+private def fourteenPath : ℕ → List Bool × Bool
+  | 0 => ([false, true], false)
+  | 1 | 2 => ([false], true)
+  | _ + 3 => ([], true)
+
+private theorem fourteen_admissible :
+    IsLetterAdmissibleSequence flipped (alternating 0) fourteenPath 3 := by
+  refine IsLetterAdmissibleSequence.of_top_prefix (IsAdmissibleSequence.of_prefixes ?_) (by decide)
+  intro i hi
+  have h : i = 0 ∨ i = 1 ∨ i = 2 := by omega
+  rcases h with rfl | rfl | rfl <;> decide
+
+private def periodTwoQuotient : ℕ :=
+  ∑ j ∈ Finset.range (4 - 2), (morphIterate flipped j (fourteenPath (j + 2)).1).length
+
+private def periodTwoRemainder : ℕ :=
+  ∑ j ∈ Finset.range 2, (morphIterate flipped j (fourteenPath j).1).length
+
+private def retainedDigits : List ℕ :=
+  0 :: (List.range (4 - 2)).reverse.map fun j => (fourteenPath (j + 2)).1.length
+
+private theorem periodTwo_values :
+    periodTwoQuotient = 1 ∧ periodTwoRemainder = 5 ∧ retainedDigits = [0, 0, 1] := by decide
+
+-- Independently check the representation and both prefix links. At index 5 the first iterate
+-- is out of bounds, and the second iterate from u₁ = true selects false.
+example : (morphIterate flipped 1 [alternating 1])[5]? = none ∧
+    (morphIterate flipped 2 [alternating 1])[5]? = some false ∧
+    IsDumontThomasRep flipped alternating 2 1 [0, 0, 1] ∧
+    IsLetterAdmissibleSequence flipped (alternating 1) fourteenPath 1 := by
+  let s := fun j => fourteenPath (j + 2)
+  have hs : IsLetterAdmissibleSequence flipped (alternating 0) s 1 := by
+    refine IsLetterAdmissibleSequence.of_top_prefix (IsAdmissibleSequence.of_prefixes ?_) (by decide)
+    intro i hi
+    obtain rfl : i = 0 := by omega
+    decide
+  refine ⟨by decide, by decide, IsDumontThomasRep.of_pos (p := 2) (N := 1) (k := 2) (s := s)
+    (by decide) (dvd_refl _) hs (by decide) (by decide), ?_⟩
+  refine IsLetterAdmissibleSequence.of_top_prefix (IsAdmissibleSequence.of_prefixes ?_) (by decide)
+  intro i hi
+  obtain rfl : i = 0 := by omega
+  decide
+
+-- The public theorem must return the same three conclusions on this positive quotient.
+example : (morphIterate flipped 2 [alternating 1])[5]? = some false ∧
+    IsDumontThomasRep flipped alternating 2 1 [0, 0, 1] ∧
+    IsLetterAdmissibleSequence flipped (alternating 1) fourteenPath 1 := by
+  have h := dumontThomasRep_quotient_remainder_pos (η := flipped) (u := alternating)
+    (p := 2) (hu := flipped_period_two) (N := 14) (k := 4) (s := fourteenPath)
+    (hN := by decide) (hk := by decide) (hs := fourteen_admissible) (htop := by decide)
+    (hpre := by decide)
+  change (morphIterate flipped 2 [alternating (periodTwoQuotient : ℤ)])[periodTwoRemainder]? =
+      some (alternating 14) ∧
+    IsDumontThomasRep flipped alternating 2 periodTwoQuotient retainedDigits ∧
+    IsLetterAdmissibleSequence flipped (alternating (periodTwoQuotient : ℤ)) fourteenPath 1 at h
+  rw [periodTwo_values.1, periodTwo_values.2.1, periodTwo_values.2.2] at h
+  simpa only [Nat.cast_one, show alternating 14 = false by decide] using h
+
 end MetaMathlibExt.dumontThomasRep_quotient_remainder_pos.Tests
