@@ -18,6 +18,7 @@ public import Mathlib.Tactic.IntervalCases
 public import MathlibExt.NumberTheory.AscFactorialBounds
 public import MathlibExt.NumberTheory.ComplementarySequences
 public import MathlibExt.NumberTheory.ComplementarySequencesInterleaveNear
+public import MathlibExt.NumberTheory.ComplementarySequencesPolygonalShift
 public import MathlibExt.NumberTheory.ComplementarySequencesNthNonCenteredPolygonal
 public import MathlibExt.NumberTheory.ComplementarySequencesInterleaveFar
 public import MathlibExt.NumberTheory.NonSecondPentagonal
@@ -53,20 +54,6 @@ public theorem_wanted nthNonValue_polygonal_eq_round (k : ℕ) (hk : 3 ≤ k) (h
     (n : ℕ) (hn : 1 ≤ n) :
     nthNonValue (fun j => (k - 2) * j * (j - 1) / 2 + j) n =
       n + ⌊Real.sqrt (2 * n / ((k : ℝ) - 2)) + 1 / 2⌋₊
-
-/-- **Shifted formula for the non-polygonal numbers.** Let $k \ge 3$, let $r$ be a real number
-with $-1 \le r \le k - 4$, and for $j \ge 1$ let $T(k, j) = (k - 2) j (j - 1)/2 + j$ be the
-$k$-gonal numbers. For every integer $n \ge 1$, put $s = \lfloor \sqrt{(2n + r)/(k - 2)} \rfloor$.
-Then the $n$-th positive integer that is not of the form $T(k, j)$ with $j \ge 1$ equals
-$n + s + 1$ if $(k - 2) s (s + 1) < 2n$, and $n + s$ otherwise.
-
-Source: Chai Wah Wu, *Algorithms for Complementary Sequences*, INTEGERS 25 (2025),
-Article A95, Theorem 5, Equation (4). -/
-public theorem_wanted nthNonValue_polygonal_shift (k : ℕ) (hk : 3 ≤ k) (r : ℝ) (hr : -1 ≤ r)
-    (hr' : r ≤ (k : ℝ) - 4) (n : ℕ) (hn : 1 ≤ n) :
-    let s := ⌊Real.sqrt ((2 * n + r) / ((k : ℝ) - 2))⌋₊
-    nthNonValue (fun j => (k - 2) * j * (j - 1) / 2 + j) n =
-      if (k - 2) * s * (s + 1) < 2 * n then n + s + 1 else n + s
 
 /-- **Rounding formula for the non-$k$-gonal numbers, every $k \ge 3$.** Let $k \ge 3$; the
 $k$-gonal numbers are $(k - 2) j (j - 1)/2 + j$ for $j \ge 1$. For every $n \ge 1$, the $n$-th
