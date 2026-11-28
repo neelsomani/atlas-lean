@@ -18,7 +18,7 @@ import Mathlib.Tactic.Positivity
 import Mathlib.Tactic.Ring
 import MathlibExt.Analysis.CentralBinomDigammaSeries
 
-/-! # Checks of the central binomial series at `m = 2` -/
+/-! # Checks of the central binomial series at `m = 1` and `m = 2` -/
 
 open Finset MetaMathlibExt
 
@@ -96,4 +96,14 @@ example : ∑' n, coeff n = Real.pi ^ 2 / 8 - 1 := by
   unfold coeff
   rw [tsum_four_pow_div_succ_mul_choose_mul_centralBinom (m := 2) (by decide)]
   norm_num [Nat.centralBinom, Nat.choose]
+  ring
+
+-- At `m = 1`, the finite correction is empty and `Nat.centralBinom 0 = 1`.
+example :
+    ∑' n : ℕ, (4 : ℝ) ^ n / (((n : ℝ) + 1) ^ 2 * ((n + 1).centralBinom : ℝ)) =
+      Real.pi ^ 2 / 8 := by
+  have h := tsum_four_pow_div_succ_mul_choose_mul_centralBinom (m := 1) (by decide)
+  simp only [Nat.choose_one_right, Nat.cast_add, Nat.cast_one, ← pow_two] at h
+  rw [h]
+  norm_num [Nat.centralBinom]
   ring
