@@ -39,6 +39,9 @@ chain has just $p$ pairs, the quotient is zero.
 * Jean-Marie Dumont and Alain Thomas, *Systèmes de numération et fonctions fractales relatifs aux
   substitutions*, Theoretical Computer Science 65 (2) (1989), pp. 153–169, Lemmas 1.1 and 1.3
   (the originals of Lemmas 3.3 and 3.4, respectively).
+* The positive quotient–remainder proof adapts the weighted-length argument from
+  `MetaMathlibExt.dumontThomas_numeration` in
+  `MathlibExt/Combinatorics/Words/DumontThomasRightNumeration.lean`.
 -/
 
 namespace MetaMathlibExt
