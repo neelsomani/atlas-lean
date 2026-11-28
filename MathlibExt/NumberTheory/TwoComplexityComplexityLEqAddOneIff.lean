@@ -18,14 +18,15 @@ For natural numbers $m \ge 1$ and even $n$ with $2^m < n \le 2^{m+1}$, the 2-com
 is $m+1$ exactly when $n = 2^m + 2^t$ for some $1 \le t \le m$. The endpoint $n = 2^{m+1}$
 is included by taking $t = m$.
 
-The independently proved lower bound for numbers not expressible as a sum of two powers forces
-the forward representation. The interval fixes the larger exponent, and evenness excludes
-exponent zero. The reverse direction uses the complexity formula for a sum of two powers.
+The paper derives Corollary 2 from Proposition 3. The Lean forward direction instead uses
+`logb_two_add_one_le`, an independent proof of the lower bound stated in Corollary 2, to obtain
+the two-power representation. The interval fixes the larger exponent, and evenness excludes
+exponent zero. The reverse direction uses the two-power complexity formula from Corollary 1.
 
 ## References
 
 * Pengcheng Zhang, *The 2-Complexity of Even Positive Integers*, INTEGERS 24 (2024),
-  Article A109, pp. 1–11, Proposition 3 and Theorem 1(1); the proof uses Corollaries 1 and 2.
+  Article A109, pp. 1–11, Proposition 3, Theorem 1(1), and Corollaries 1 and 2.
   <https://math.colgate.edu/~integers/vol24.html>
 * ATLAS: `MathlibExt.NumberTheory.TwoComplexity` (`logb_two_add_one_le` and
   `largest_exponent_of_two_pow_add_two_pow`) and
