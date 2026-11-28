@@ -25,6 +25,7 @@ public import Mathlib.Topology.Algebra.InfiniteSum.Real
 public import MathlibExt.NumberTheory.FibonacciPolynomialOddPowerSub
 public import MathlibExt.NumberTheory.GibonacciPolynomialPowerSums
 public import MathlibExt.NumberTheory.LucasSequence
+public import MathlibExt.NumberTheory.GibonacciPolynomialEvenPowerEvenIndex
 public import MathlibExt.NumberTheory.GibonacciPolynomialPowerSumsFibPolyPowEvenSub
 
 namespace MetaMathlibExt
@@ -262,26 +263,6 @@ public theorem_wanted tsum_lucas_cube_odd_index :
         ((lucasNumber (2 * (n + 1) + 1) : ℝ) ^ 2 + 5) ^ 3 = 1 / 27 ∧
       ∑' n : ℕ, (8 * (Nat.fib (6 * (n + 1) + 3) : ℝ) - 3 * (Nat.fib (2 * (n + 1) + 1) : ℝ)) /
           ((lucasNumber (2 * (n + 1) + 1) : ℝ) ^ 2 - 5) ^ 3 = 13 / 64
-
-/-- **Series of even powers of Fibonacci polynomials at even indices.** Let $f_i$ be the
-Fibonacci polynomials, defined by $f_0 = 0$, $f_1 = 1$ and $f_{i+2} = x f_{i+1} + f_i$. Let
-$x > 0$ be real and let $k$ and $m$ be positive integers. If $k$ is odd, put $L = (k + 1)/2$ and
-$s_r = 2r - 1$; if $k$ is even, put $L = k/2 + 1$ and $s_r = 2r$. Then
-$$
-\sum_{n \ge L} \frac{\sum_{j=0}^{m-1} \binom{2m}{j} (-1)^{(k+1)j} f_{2k(m-j)}(x)
-f_{4n(m-j)}(x)}{\bigl(f_{2n}(x)^2 - (-1)^k f_k(x)^2\bigr)^{2m}} =
-(x^2 + 4)^{m-1} \sum_{r=1}^{k} \frac{1}{f_{s_r}(x)^{2m}}.
-$$
-
-Source: Yinqi Lin and Bo Zhou, *Infinite Sums Involving Powers of Gibonacci Polynomials*,
-The Fibonacci Quarterly 62 (2024), Article linzhou02172024,
-Theorem 1.1 (`fq-2024-linzhou02172024-thm-1.1`). -/
-public theorem_wanted tsum_fibPoly_even_pow_even_index {x : ℝ} (hx : 0 < x) {k m : ℕ}
-    (hk : 0 < k) (hm : 0 < m) :
-    ∑' n : ℕ, (∑ j ∈ Finset.range m, ((2 * m).choose j : ℝ) * (-1) ^ ((k + 1) * j) *
-          aeval x (𝔣 (2 * k * (m - j))) * aeval x (𝔣 (4 * (n + 𝔏[k]) * (m - j)))) /
-        (aeval x (𝔣 (2 * (n + 𝔏[k]))) ^ 2 - (-1) ^ k * aeval x (𝔣 k) ^ 2) ^ (2 * m) =
-      (x ^ 2 + 4) ^ (m - 1) * ∑ r ∈ Finset.Icc 1 k, 1 / aeval x (𝔣 𝔰[k, r]) ^ (2 * m)
 
 /-- **Even-power sums with even-index Lucas polynomial denominators.** Let $f_n$ and $\ell_n$
 denote the Fibonacci and Lucas polynomials, given by $f_0 = 0$, $f_1 = 1$, $\ell_0 = 2$,
