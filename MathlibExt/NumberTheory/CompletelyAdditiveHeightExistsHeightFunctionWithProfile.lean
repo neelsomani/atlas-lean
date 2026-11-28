@@ -155,17 +155,23 @@ private theorem index_level_ncard (π : ℕ → ℕ)
   have h := profilePartialSum_pred_add π k hk
   omega
 
-private theorem nthPrimeOne_prime (i : ℕ) : (nthPrimeOne i).Prime := by
+/-- **The one-based prime enumeration takes prime values.** Every `nthPrimeOne i` is prime,
+including at `i = 0`, where the enumeration repeats its first prime. -/
+public theorem nthPrimeOne_prime (i : ℕ) : (nthPrimeOne i).Prime := by
   unfold nthPrimeOne
   exact Nat.nth_mem_of_infinite Nat.infinite_setOfPred_prime (i - 1)
 
-private theorem count_nthPrimeOne (i : ℕ) (hi : 1 ≤ i) :
+/-- **The index of the enumerated prime.** For `i ≥ 1`, exactly `i - 1` primes lie strictly
+below `nthPrimeOne i`, so its one-based index is `i`. -/
+public theorem count_nthPrimeOne (i : ℕ) (hi : 1 ≤ i) :
     Nat.count Nat.Prime (nthPrimeOne i) + 1 = i := by
   unfold nthPrimeOne
   rw [Nat.count_nth_of_infinite Nat.infinite_setOfPred_prime]
   omega
 
-private theorem nthPrimeOne_count (p : ℕ) (hp : p.Prime) :
+/-- **Recovering a prime from its index.** If `p` is prime, enumerating at the one-based index
+`Nat.count Nat.Prime p + 1` recovers `p`. -/
+public theorem nthPrimeOne_count (p : ℕ) (hp : p.Prime) :
     nthPrimeOne (Nat.count Nat.Prime p + 1) = p := by
   unfold nthPrimeOne
   rw [Nat.add_sub_cancel]

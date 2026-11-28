@@ -29,6 +29,7 @@ import Batteries.Util.ProofWanted
 public import Mathlib.NumberTheory.LSeries.RiemannZeta
 public import Mathlib.Analysis.SpecialFunctions.Gamma.Basic
 public import MathlibExt.NumberTheory.CompletelyAdditiveHeight
+public import MathlibExt.NumberTheory.CompletelyAdditiveHeight.Iterative
 public import MathlibExt.NumberTheory.CompletelyAdditiveHeightIsGreatestPrimeIndexHeightLevel
 public import MathlibExt.NumberTheory.CompletelyAdditiveHeightExistsHeightFunctionWithProfile
 public import MathlibExt.NumberTheory.CompletelyAdditiveHeightSumHeightAsymptotic
@@ -98,24 +99,6 @@ public theorem_wanted nthPrimeOne_rosser_schoenfeld :
     ∃ k₀ : ℕ, ∀ k ≥ k₀,
       (k : ℝ) * (Real.log k + Real.log (Real.log k) - 1) ≤ nthPrimeOne k ∧
         (nthPrimeOne k : ℝ) ≤ k * (Real.log k + Real.log (Real.log k))
-
-/-- **Iteratively defined height functions.** Write $p_i$ for the $i$-th prime, so $p_1 = 2$. Let
-$f : \mathbb{N} \to \mathbb{N}$ satisfy $f(1) = 1$; suppose that for all integers $i, r \ge 1$, if
-$p_r$ divides $f(i)$ then $r < i$ (this forces $f(i) \ge 1$ for $i \ge 1$); and suppose that for
-every $t \ge 1$ only finitely many $i \ge 1$ have $f(i) = t$. Let $j \ge 1$. Then there is a
-function $H : \mathbb{N} \to \mathbb{N}$ that is completely additive on the positive integers and
-satisfies $H(p_i) = H(f(i)) + j$ for every $i \ge 1$, and every such $H$ is a height function.
-
-The case $i = 1$ gives $H(2) = j$.
-
-Source: Hartosh Singh Bal, *Completely Additive Height Functions: Profile Laws, Matula Bounds,
-and Inverse Growth*, INTEGERS 26 (2026), Article A116, Theorem 2 (`integers-2026-A116-thm-2`). -/
-public theorem_wanted isHeightFunction_of_iterative (f : ℕ → ℕ) (hf1 : f 1 = 1)
-    (hdiv : ∀ i r, 1 ≤ i → 1 ≤ r → nthPrimeOne r ∣ f i → r < i)
-    (hfin : ∀ t, 1 ≤ t → {i : ℕ | 1 ≤ i ∧ f i = t}.Finite) {j : ℕ} (hj : 1 ≤ j) :
-    (∃ H : ℕ → ℕ, IsCompletelyAdditiveNat H ∧ ∀ i, 1 ≤ i → H (nthPrimeOne i) = H (f i) + j) ∧
-      ∀ H : ℕ → ℕ, IsCompletelyAdditiveNat H → (∀ i, 1 ≤ i → H (nthPrimeOne i) = H (f i) + j) →
-        IsHeightFunction H
 
 /-- **Meinardus' theorem.** Let $b_0, b_1, b_2, \dots$ be nonnegative reals with $b_k \ne 0$ for
 some $k \ge 1$, and let $a_n$ be the coefficients of the weighted partition product
