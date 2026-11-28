@@ -12,6 +12,8 @@ public import Mathlib.Analysis.SpecialFunctions.Gamma.Digamma
 public import Mathlib.Data.Nat.Choose.Central
 import MathlibExt.Analysis.SpecialFunctions.Gamma.Digamma
 import Mathlib.Analysis.PSeries
+import Mathlib.NumberTheory.ZetaValues
+import MathlibExt.Analysis.HalfIntegerHarmonic
 import Mathlib.Tactic.FieldSimp
 import Mathlib.Tactic.Linarith
 import Mathlib.Tactic.LinearCombination
@@ -24,11 +26,14 @@ import Mathlib.Tactic.Ring
 This module evaluates a central binomial series for complex $h$ with $\operatorname{Re} h > -1/2$
 and $h$ not a nonnegative integer. It also evaluates the product series for $\pi \cot(\pi/k)$
 for integers $k \ge 2$. Both results use Nörlund's expansion of a digamma difference.
+For positive integers $m$, a nonnegative double series reduces the central binomial sum
+with denominator $(n+1)\binom{n+m}{m}\binom{2(n+m)}{n+m}$ to an inverse-square tail.
 
 ## References
 
 * Kunle Adegoke and Robert Frontczak, *Series Associated with a Forgotten Identity of Nörlund*,
-  INTEGERS 25 (2025), Article A18, pp. 1–12, Theorems 1 and 8 (identity (19) in Theorem 8).
+  INTEGERS 25 (2025), Article A18, pp. 1–12, Theorem 1, Theorem 8 (19), Theorem 10 (23)
+  and Lemma 1.
   <https://math.colgate.edu/~integers/z18/z18.pdf>
 * Einar Hille, *On the Logarithmic Derivatives of the Gamma Function*,
   Mathematisk-fysiske Meddelelser 8 (1927), no. 1, 58 pp., §2, p. 6, equation (22).
@@ -245,6 +250,126 @@ private lemma binom_term {h : ℂ} (ha : ∀ k : ℕ, -h ≠ -k) (n : ℕ) :
   have hf : (n.factorial : ℂ) ≠ 0 := by exact_mod_cast n.factorial_ne_zero
   field_simp [hn, hc, hf]
 
+-- For positive x, summing over the factorial index telescopes to 1 / x².
+private lemma hasSum_factorial_div_rising {x : ℝ} (hx : 0 < x) :
+    HasSum (fun n : ℕ ↦ (n.factorial : ℝ) / rising x (n + 2)) (1 / x ^ 2) := by
+  let b (n : ℕ) : ℝ := (n.factorial : ℝ) / rising x (n + 1) / x
+  have hstep (n : ℕ) : (n.factorial : ℝ) / rising x (n + 2) = b n - b (n + 1) := by
+    dsimp [b]
+    rw [rising_succ x (n + 1), Nat.factorial_succ]
+    push_cast
+    field_simp [hx.ne', (rising_pos hx (n + 1)).ne']
+    ring
+  have ha (j : ℕ) : (1 : ℂ) ≠ -(j : ℂ) := by
+    intro h
+    have h' := congrArg Complex.re h
+    simp only [Complex.one_re, Complex.neg_re, Complex.natCast_re] at h'
+    linarith [Nat.cast_nonneg (α := ℝ) j]
+  have hlim := ratio_tendsto (a := 1) (w := x + 1) ha (by positivity)
+    (by simpa using hx)
+  have hratio : ratio 1 (x + 1) =
+      fun n ↦ Complex.ofReal ((n.factorial : ℝ) / rising (x + 1) n) := by
+    funext n
+    simp only [ratio, Complex.ofReal_div, rising_cast, Complex.ofReal_natCast]
+    congr 1
+    simp only [rising, Nat.factorial_eq_prod_range_add_one n, Nat.cast_prod, Nat.cast_add,
+      Nat.cast_one, add_comm]
+  have hreal : Tendsto (fun n : ℕ ↦ (n.factorial : ℝ) / rising (x + 1) n) atTop (𝓝 0) := by
+    apply tendsto_ofReal_iff.mp
+    rw [Complex.ofReal_zero, ← hratio]
+    exact (tendsto_add_atTop_iff_nat 1).mp hlim
+  have hb : Tendsto b atTop (𝓝 0) := by
+    simpa [b, rising_shift, div_div, mul_assoc] using (hreal.div_const x).div_const x
+  apply (hasSum_iff_tendsto_nat_of_nonneg (fun n ↦
+    div_nonneg (by positivity) (rising_pos hx (n + 2)).le) _).2
+  simp_rw [hstep, sum_range_sub' b]
+  simpa [b, rising, pow_two, div_div] using tendsto_const_nhds.sub hb
+
+-- Evaluate the half-integer tail using the second-order part of Lemma 1.
+private lemma hasSum_inv_sq_add_half (k : ℕ) :
+    HasSum (fun j : ℕ ↦ 1 / ((k : ℝ) + 1 / 2 + j) ^ 2)
+      (3 * (Real.pi ^ 2 / 6) - 4 * ∑ j ∈ range k, 1 / (2 * (j : ℝ) + 1) ^ 2) := by
+  have hbasel : HasSum (fun j : ℕ ↦ 1 / ((j : ℝ) + 1) ^ 2) (Real.pi ^ 2 / 6) := by
+    simpa using (hasSum_nat_add_iff' 1).2 hasSum_zeta_two
+  have hζ : riemannZeta (2 : ℂ) = ((Real.pi ^ 2 / 6 : ℝ) : ℂ) := by
+    rw [show (2 : ℂ) = ((2 : ℕ) : ℂ) by norm_num, zeta_nat_eq_tsum_of_gt_one (by decide)]
+    simpa using (Complex.hasSum_ofReal.mpr hasSum_zeta_two).tsum_eq
+  have hs : Summable (fun j : ℕ ↦ 1 / ((k : ℝ) + 1 / 2 + j) ^ 2) := by
+    refine (hbasel.mul_left 4).summable.of_nonneg_of_le (fun _ ↦ by positivity) (fun j ↦ ?_)
+    calc
+      _ ≤ 1 / (((j : ℝ) + 1) / 2) ^ 2 := by
+        apply one_div_le_one_div_of_le (by positivity) (pow_le_pow_left₀ (by positivity) ?_ 2)
+        linarith [Nat.cast_nonneg (α := ℝ) k, Nat.cast_nonneg (α := ℝ) j]
+      _ = _ := by rw [div_pow, one_div_div, mul_one_div]; norm_num
+  have hgap : (∑' j : ℕ, (1 / ((j : ℝ) + 1) ^ 2 - 1 / ((k : ℝ) + 1 / 2 + j) ^ 2)) =
+      -2 * (Real.pi ^ 2 / 6) + 4 * ∑ j ∈ range k, 1 / (2 * (j : ℝ) + 1) ^ 2 := by
+    apply Complex.ofReal_injective
+    rw [Complex.ofReal_tsum]
+    push_cast
+    simp_rw [add_comm ((k : ℂ) + 1 / 2), ← add_assoc]
+    rw [(harmonic_nat_sub_half_values k).2.1, hζ]
+    push_cast
+    ring
+  rw [hbasel.summable.tsum_sub hs, hbasel.tsum_eq] at hgap
+  apply hs.hasSum_iff.mpr
+  linarith only [hgap]
+
+-- Split the product at k and use the two factorial identities for the binomial factors.
+private lemma halfInteger_binom_term (k n : ℕ) :
+    (4 : ℝ) ^ n / (((n : ℝ) + 1) * ((n + (k + 1)).choose (k + 1) : ℝ) *
+        ((n + (k + 1)).centralBinom : ℝ)) =
+      ((k : ℝ) + 1) / 4 / (k.centralBinom : ℝ) *
+        ((n.factorial : ℝ) / ((n : ℝ) + 1) / rising ((k : ℝ) + 1 / 2) (n + 1)) := by
+  have hsplit : rising (1 / 2 : ℝ) (n + (k + 1)) =
+      rising (1 / 2 : ℝ) k * rising ((k : ℝ) + 1 / 2) (n + 1) := by
+    rw [show n + (k + 1) = k + (n + 1) by omega]
+    simp only [rising]
+    rw [prod_range_add]
+    congr 1
+    exact prod_congr rfl fun j _ ↦ by push_cast; ring
+  have hchoose : ((n + (k + 1)).choose (k + 1) : ℝ) * (n.factorial : ℝ) *
+      (((k : ℝ) + 1) * (k.factorial : ℝ)) = ((n + (k + 1)).factorial : ℝ) := by
+    exact_mod_cast (by rw [← Nat.factorial_succ, Nat.add_choose_mul_factorial_mul_factorial])
+  have hprod : rising ((k : ℝ) + 1 / 2) (n + 1) *
+      ((k.factorial : ℝ) * (k.centralBinom : ℝ) * 4 ^ (n + 1)) =
+      ((n + (k + 1)).factorial : ℝ) * ((n + (k + 1)).centralBinom : ℝ) := by
+    rw [← rising_half (n + (k + 1)), hsplit, ← rising_half k,
+      show n + (k + 1) = k + (n + 1) by omega, pow_add]
+    ring
+  rw [← hchoose, pow_succ] at hprod
+  have hr : rising ((k : ℝ) + 1 / 2) (n + 1) * (k.centralBinom : ℝ) * (4 ^ n * 4) =
+      ((n + (k + 1)).choose (k + 1) : ℝ) * (n.factorial : ℝ) * ((k : ℝ) + 1) *
+        ((n + (k + 1)).centralBinom : ℝ) := by
+    apply mul_left_cancel₀ (show (k.factorial : ℝ) ≠ 0 by positivity)
+    linear_combination hprod
+  have hc : (0 : ℝ) < ((n + (k + 1)).choose (k + 1) : ℝ) := by
+    exact_mod_cast Nat.choose_pos (Nat.le_add_left (k + 1) n)
+  have hp := rising_pos (show 0 < (k : ℝ) + 1 / 2 by positivity) (n + 1)
+  have hcentral (j : ℕ) : (j.centralBinom : ℝ) ≠ 0 := by
+    exact_mod_cast Nat.centralBinom_ne_zero j
+  generalize hR : rising ((k : ℝ) + 1 / 2) (n + 1) = R at hr ⊢
+  have hR_ne : R ≠ 0 := hR ▸ hp.ne'
+  field_simp [hc.ne', hR_ne, hcentral]
+  linear_combination hr
+
+private lemma tsum_factorial_div_rising {w s : ℝ} (hw : 0 < w)
+    (hs : HasSum (fun k : ℕ ↦ 1 / (w + k) ^ 2) s) :
+    ∑' n : ℕ, (n.factorial : ℝ) / ((n : ℝ) + 1) / rising w (n + 1) = s := by
+  let f (k n : ℕ) : ℝ := (n.factorial : ℝ) / rising (w + k) (n + 2)
+  have hrow (k : ℕ) : HasSum (f k) (1 / (w + k) ^ 2) := hasSum_factorial_div_rising (by positivity)
+  have hcol (n : ℕ) : HasSum (fun k ↦ f k n)
+      ((n.factorial : ℝ) / ((n : ℝ) + 1) / rising w (n + 1)) := by
+    simpa only [f, div_eq_mul_inv, mul_assoc, mul_comm ((rising w (n + 1))⁻¹)] using
+      (column hw n).mul_left (n.factorial : ℝ)
+  have hnonneg (p : ℕ × ℕ) : 0 ≤ f p.1 p.2 :=
+    div_nonneg (by positivity) (rising_pos (show 0 < w + p.1 by positivity) _).le
+  have hprod : Summable (fun p : ℕ × ℕ ↦ f p.1 p.2) := by
+    refine (summable_prod_of_nonneg hnonneg).2 ⟨fun k ↦ (hrow k).summable, ?_⟩
+    simpa only [(hrow _).tsum_eq] using hs.summable
+  have h := Summable.tsum_comm (f := f) hprod
+  simp_rw [(hrow _).tsum_eq, (hcol _).tsum_eq] at h
+  exact h.trans hs.tsum_eq
+
 end CentralBinomDigammaSeries
 
 open CentralBinomDigammaSeries
@@ -355,5 +480,25 @@ public theorem sub_two_mul_one_add_tsum_prod_eq_pi_mul_cot {k : ℕ} (hk : 2 ≤
     Complex.ofReal_div]
   rw [show (Real.pi : ℂ) / k = (Real.pi : ℂ) * (w : ℂ) by simp [w, div_eq_mul_inv]]
   linear_combination hsum
+
+/-- **Series over $4^n$ with binomial and central binomial denominators.** Write
+$O^{(2)}_k = \sum_{j=1}^{k} 1/(2j-1)^2$. For every positive integer $m$,
+$$\sum_{n=0}^{\infty} \frac{4^n}{(n+1) \binom{n+m}{m} \binom{2(n+m)}{n+m}} =
+\frac{m}{4} \cdot \frac{3 \cdot \pi^2/6 - 4 O^{(2)}_{m-1}}{\binom{2(m-1)}{m-1}}.$$
+
+Source: Kunle Adegoke and Robert Frontczak, *Series Associated with a Forgotten Identity of
+Nörlund*, INTEGERS 25 (2025), Article A18, Theorem 10, identity (23)
+(`integers-2025-A18-thm-10`). -/
+public theorem tsum_four_pow_div_succ_mul_choose_mul_centralBinom {m : ℕ} (hm : 0 < m) :
+    ∑' n : ℕ, (4 : ℝ) ^ n /
+        (((n : ℝ) + 1) * ((n + m).choose m : ℝ) * ((n + m).centralBinom : ℝ)) =
+      (m : ℝ) / 4 *
+          (3 * (Real.pi ^ 2 / 6) - 4 * ∑ j ∈ Finset.range (m - 1), 1 / (2 * (j : ℝ) + 1) ^ 2) /
+        ((m - 1).centralBinom : ℝ) := by
+  obtain ⟨k, rfl⟩ := Nat.exists_eq_succ_of_ne_zero hm.ne'
+  simp only [Nat.succ_sub_one, Nat.cast_succ]
+  simp_rw [halfInteger_binom_term]
+  rw [tsum_mul_left, tsum_factorial_div_rising (by positivity) (hasSum_inv_sq_add_half k)]
+  ring
 
 end MetaMathlibExt

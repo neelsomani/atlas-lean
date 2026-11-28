@@ -242,21 +242,6 @@ public theorem_wanted tsum_centralBinom_mul_odd_harmonic_div_choose_mul_centralB
             (((h - n).centralBinom : ℝ) * ((n + 1).centralBinom : ℝ)) *
           (∑ j ∈ Finset.range (h - n), 1 / (2 * (j : ℝ) + 1)) / ((n : ℝ) + 1) ^ 2
 
-/-- **Series over $4^n$ with binomial and central binomial denominators.** Write
-$O^{(2)}_k = \sum_{j=1}^{k} 1/(2j-1)^2$. For every positive integer $m$,
-$$\sum_{n=0}^{\infty} \frac{4^n}{(n+1) \binom{n+m}{m} \binom{2(n+m)}{n+m}} =
-\frac{m}{4} \cdot \frac{3 \cdot \pi^2/6 - 4 O^{(2)}_{m-1}}{\binom{2(m-1)}{m-1}}.$$
-
-Source: Kunle Adegoke and Robert Frontczak, *Series Associated with a Forgotten Identity of
-Nörlund*, INTEGERS 25 (2025), Article A18, Theorem 10, identity (23)
-(`integers-2025-A18-thm-10`). -/
-public theorem_wanted tsum_four_pow_div_succ_mul_choose_mul_centralBinom {m : ℕ} (hm : 0 < m) :
-    ∑' n : ℕ, (4 : ℝ) ^ n /
-        (((n : ℝ) + 1) * ((n + m).choose m : ℝ) * ((n + m).centralBinom : ℝ)) =
-      (m : ℝ) / 4 *
-          (3 * (Real.pi ^ 2 / 6) - 4 * ∑ j ∈ Finset.range (m - 1), 1 / (2 * (j : ℝ) + 1) ^ 2) /
-        ((m - 1).centralBinom : ℝ)
-
 /-- **An odd harmonic series with binomial and central binomial denominators.** Let $\zeta$ be
 the Riemann zeta function, let $O^{(r)}_k = \sum_{j=1}^{k} 1/(2j-1)^r$ be the $k$-th odd harmonic
 number of order $r$, and write $O_k = O^{(1)}_k$. For every positive integer $m$,
