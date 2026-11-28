@@ -26,6 +26,7 @@ public import MathlibExt.NumberTheory.FibonacciPolynomialOddPowerSub
 public import MathlibExt.NumberTheory.GibonacciPolynomialPowerSums
 public import MathlibExt.NumberTheory.LucasSequence
 public import MathlibExt.NumberTheory.GibonacciPolynomialPowerSumsFibPolyPowEvenSub
+public import MathlibExt.NumberTheory.GibonacciPolynomialPowerSumsCubeOddIndex
 
 namespace MetaMathlibExt
 
@@ -140,33 +141,6 @@ public theorem_wanted tsum_lucasPoly_cube_even_index {x : ℝ} (hx : 0 < x) :
           3 * x * aeval x (𝔣 (2 * (n + 2)))) /
           (aeval x (𝔩 (2 * (n + 2))) ^ 2 + (x ^ 2 + 4) * x ^ 2) ^ 3 =
         1 / (x ^ 2 + 4) * (1 / (x ^ 2 + 2) ^ 3 + 1 / (x ^ 4 + 4 * x ^ 2 + 2) ^ 3)
-
-/-- **Cubic-denominator series for odd-index Fibonacci polynomials.** Let $f_i$ and $\ell_i$ be the
-Fibonacci and Lucas polynomials, defined by $f_0 = 0$, $f_1 = 1$, $\ell_0 = 2$, $\ell_1 = x$ and
-$g_{i+2} = x g_{i+1} + g_i$ for $g = f, \ell$. For every real $x > 0$,
-$$
-\sum_{n \ge 1} \frac{(x^3 + 3x) f_{6n+3}(x) - 3x f_{2n+1}(x)}{(f_{2n+1}(x)^2 - 1)^3} =
-\frac{x^2 + 4}{x^3}
-$$
-and
-$$
-\sum_{n \ge 1} \frac{x(x^4 + 4x^2 + 3) \ell_{6n+3}(x) + 3x \ell_{2n+1}(x)}
-{(f_{2n+1}(x)^2 + x^2)^3} =
-\frac{(x^2 + 4)\bigl((x^2 + 1)^3 + 1\bigr)}{(x^2 + 1)^3}.
-$$
-
-Source: Yinqi Lin and Bo Zhou, *Infinite Sums Involving Powers of Gibonacci Polynomials*,
-The Fibonacci Quarterly 62 (2024), Article linzhou02172024,
-Corollary 4.7 (`fq-2024-linzhou02172024-cor-4.7`). -/
-public theorem_wanted tsum_fibPoly_cube_odd_index {x : ℝ} (hx : 0 < x) :
-    ∑' n : ℕ, ((x ^ 3 + 3 * x) * aeval x (𝔣 (6 * (n + 1) + 3)) -
-          3 * x * aeval x (𝔣 (2 * (n + 1) + 1))) /
-        (aeval x (𝔣 (2 * (n + 1) + 1)) ^ 2 - 1) ^ 3 =
-      (x ^ 2 + 4) / x ^ 3 ∧
-      ∑' n : ℕ, (x * (x ^ 4 + 4 * x ^ 2 + 3) * aeval x (𝔩 (6 * (n + 1) + 3)) +
-          3 * x * aeval x (𝔩 (2 * (n + 1) + 1))) /
-          (aeval x (𝔣 (2 * (n + 1) + 1)) ^ 2 + x ^ 2) ^ 3 =
-        (x ^ 2 + 4) * ((x ^ 2 + 1) ^ 3 + 1) / (x ^ 2 + 1) ^ 3
 
 /-- **Cubic sums with odd-index Lucas polynomial denominators.** Let $f_n$ and $\ell_n$ denote the
 Fibonacci and Lucas polynomials, given by $f_0 = 0$, $f_1 = 1$, $\ell_0 = 2$, $\ell_1 = x$ and
