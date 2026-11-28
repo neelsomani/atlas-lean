@@ -18,11 +18,15 @@ import Mathlib.Tactic.Positivity
 import Mathlib.Tactic.Ring
 
 /-!
-Source: Abdelmalek Abdesselam, "An algebraic independence result related to a
-conjecture of Dixmier on binary form invariants", arXiv:1903.11147v2,
-published in Research in the Mathematical Sciences 6 (2019), article 26.
-Factorial conventions: TeX lines 322-349; upsilon_m definition: lines 415-421;
-Proposition (Dixon), terminating 3F2 summation: lines 502-512.
+# Dixon's summation
+
+## References
+
+* Abdelmalek Abdesselam, *An algebraic independence result related to a conjecture of Dixmier on
+  binary form invariants*, Research in the Mathematical Sciences 6 (2019), Article 26,
+  Section 3, Proposition 5 (Dixon's summation).
+* A. C. Dixon, *Summation of a certain Series*, Proceedings of the London Mathematical Society
+  s1-35 (1903), 284–289 (the general summation).
 -/
 
 @[expose] public section
@@ -428,9 +432,21 @@ private lemma dixon_normalized_sum (a b c : ℤ)
     rw [Finset.sum_sub_distrib, ← Finset.sum_div, ← Finset.sum_div] at hsum
     exact (sub_eq_zero.mp hsum).trans ih
 
-private lemma dixon_kernel_sum (a b c : ℤ)
-    (ha : 0 ≤ a) (hb : 0 ≤ b) (hc : 0 ≤ c) :
-    (∑ k ∈ Finset.Icc (-a) a, dixon_kernel a b c k) = dixon_phi a b c := by
+/-- **Dixon's summation in inverse-factorial form.** For nonnegative integers $a$, $b$, and $c$,
+use the convention that an inverse factorial at a negative index is zero. Then
+
+$$
+\sum_{k=-a}^{a} \frac{(-1)^k}{(a+k)!(a-k)!(b+k)!(b-k)!(c+k)!(c-k)!}
+= \frac{(a+b+c)!}{(a+b)!(a+c)!(b+c)!a!b!c!}.
+$$
+
+This is the factorial-normalized form of Dixon's summation (Abdesselam, Proposition 5). -/
+public theorem dixon_kernel_sum (a b c : ℤ) (ha : 0 ≤ a) (hb : 0 ≤ b) (hc : 0 ≤ c) :
+    (∑ k ∈ Finset.Icc (-a) a, (-1 : ℚ) ^ k * invFact (a + k) * invFact (a - k) *
+      invFact (b + k) * invFact (b - k) * invFact (c + k) * invFact (c - k)) =
+      extFact (a + b + c) * invFact (a + b) * invFact (a + c) *
+        invFact (b + c) * invFact a * invFact b * invFact c := by
+  change (∑ k ∈ Finset.Icc (-a) a, dixon_kernel a b c k) = dixon_phi a b c
   apply (div_eq_one_iff_eq (dixon_phi_pos a b c ha hb hc).ne').mp
   exact dixon_normalized_sum a b c ha hb hc
 
@@ -439,7 +455,9 @@ private lemma dixon_nonneg (a b c : ℤ) (ha : 0 ≤ a) (hb : 0 ≤ b) (hc : 0 �
       extFact (2 * a) * extFact (2 * b) * extFact (2 * c) * dixon_phi a b c := by
   unfold upsilon₃
   simp_rw [dixon_summand_eq]
-  rw [← Finset.mul_sum, dixon_sum_window, dixon_kernel_sum a b c ha hb hc]
+  rw [← Finset.mul_sum, dixon_sum_window]
+  exact congrArg (extFact (2 * a) * extFact (2 * b) * extFact (2 * c) * ·)
+    (dixon_kernel_sum a b c ha hb hc)
 
 private lemma dixon_upsilon_of_prefactor_eq_zero (a b c : ℤ)
     (h : extFact (2 * a) * extFact (2 * b) * extFact (2 * c) = 0) :

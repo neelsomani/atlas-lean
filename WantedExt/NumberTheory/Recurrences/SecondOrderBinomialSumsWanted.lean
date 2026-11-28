@@ -19,6 +19,7 @@ public import WantedExt.NumberTheory.SecondOrderGenFunIntegerValuesWanted
 public import MathlibExt.NumberTheory.Recurrences.SecondOrderBinomialSumsSecondOrderBiSeqSumCentralChooseMul
 public import MathlibExt.NumberTheory.Recurrences.LucasTripleBinomialConvolution
 public import MathlibExt.NumberTheory.Recurrences.LucasEvenCatalanConvolution
+public import MathlibExt.NumberTheory.Recurrences.LucasAlternatingTwoBinomialCatalanConvolution
 
 /-!
 # Binomial sums involving `U_n = p U_{n-1} + U_{n-2}` and `V_n = p V_{n-1} + V_{n-2}`
@@ -138,24 +139,6 @@ public theorem_wanted lucasU_lucasV_sum_choose_catalan_alternating (p : ℤ) (n 
         (-1) ^ k * ((4 * n).choose (2 * k) * catalan k * catalan (2 * n - k) : ℤ) *
           lucasU ⟨p, -1, by decide⟩ (2 * n - k) * lucasV ⟨p, -1, by decide⟩ k =
       (-1) ^ n * (catalan n * catalan (2 * n) : ℤ) * lucasU ⟨p, -1, by decide⟩ (2 * n)
-
-/-- **Alternating two-binomial Catalan convolution of U and V.** Let $p$ be an integer and let $U$
-and $V$ be the Lucas sequences $U(p, -1)$ and $V(p, -1)$, so that $U_0 = 0$, $U_1 = 1$, $V_0 = 2$,
-$V_1 = p$, and both satisfy $X_{j+2} = p X_{j+1} + X_j$. Writing $C_j$ for the $j$-th Catalan
-number, for every natural number $n$
-$$\sum_{k=0}^{2n} (-1)^k \binom{2n}{k} \binom{4n}{2k} C_k C_{2n-k} U_{2n-k} V_k =
-(-1)^n \binom{3n+1}{n} C_n C_{2n} U_{2n}.$$
-
-Source: John M. Campbell and Emrah Kılıç, *Binomial Sums Involving Second-Order Linearly Recurrent
-Sequences*, The Fibonacci Quarterly 62 (2024), Article 62-1/campbell10202023,
-Proposition 2.13. -/
-public theorem_wanted lucasU_lucasV_sum_choose_sq_catalan_alternating (p : ℤ) (n : ℕ) :
-    ∑ k ∈ Finset.range (2 * n + 1),
-        (-1) ^ k *
-            ((2 * n).choose k * (4 * n).choose (2 * k) * catalan k * catalan (2 * n - k) : ℤ) *
-          lucasU ⟨p, -1, by decide⟩ (2 * n - k) * lucasV ⟨p, -1, by decide⟩ k =
-      (-1) ^ n * ((3 * n + 1).choose n * catalan n * catalan (2 * n) : ℤ) *
-        lucasU ⟨p, -1, by decide⟩ (2 * n)
 
 /-- **Binomial sums with signs $(-1)^{\binom{k}{2}}$ and Lucas sequences.** Let $p$ be an integer
 and let $U_n$ and $V_n$ be the Lucas sequences $U(p, -1)$ and $V(p, -1)$, so $U_0 = 0$,
