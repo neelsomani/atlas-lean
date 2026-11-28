@@ -21,6 +21,14 @@ import Mathlib.Tactic.Ring
 Given exactly one case in a matched set, the case probabilities are independent of the
 intercept and invariant under a common additive shift of all subjects' exposure vectors.
 
+For finitely many sets, each with one case in position `0`, a possibly varying number of
+controls and real exposure vectors of the same dimension, the product of the case-weight
+fractions equals the product written in terms of the control-minus-case exposure differences,
+for every coefficient vector. A set with zero controls contributes `1` in both forms, and one
+control gives the matched-pair formula. The equality is algebraic; under the logistic model
+with independent outcomes within sets and independence across sets, it is an equality of
+formulas for the joint conditional likelihood.
+
 For independent 1:1 pairs with binary exposure and independent outcomes within each pair,
 if both discordant counts `n₁₀` and `n₀₁` are positive, the unconditional log-likelihood of
 these discordant pairs is maximized at slope `2 log (n₁₀ / n₀₁)` with each pair's own
@@ -31,7 +39,14 @@ maximizing slope because their contributions can be maximized separately at any 
 
 * N. E. Breslow and N. E. Day, *Statistical Methods in Cancer Research Volume I: The Analysis
   of Case-Control Studies*, IARC Scientific Publications No. 32, Lyon (1980), ch. 7, §§7.1–7.2,
-  pp. 249–251. The unconditional maximizer is on p. 250.
+  pp. 249–253. The unconditional maximizer is on p. 250; the likelihood identity is Eq. (7.2),
+  p. 251, and its one-control specialization is Eq. (7.3), p. 253.
+* F. D. K. Liddell, J. C. McDonald and D. C. Thomas, *Methods of Cohort Analysis: Appraisal by
+  Application to Asbestos Mining*, J. R. Stat. Soc. Ser. A 140 (1977), pp. 469–491, cited for
+  Eq. (7.2) by Breslow and Day.
+* N. E. Breslow, N. E. Day, K. T. Halvorsen, R. L. Prentice and C. Sabai, *Estimation of Multiple
+  Relative Risk Functions in Matched Case-Control Studies*, Am. J. Epidemiol. 108 (1978),
+  pp. 299–307, cited for Eq. (7.2) by Breslow and Day.
 * E. B. Andersen, *Conditional Inference and Models for Measuring*, Mentalhygiejnisk Forlag,
   København (1973), p. 69, credited by Breslow and Day for the squared discordant-pair ratio.
 -/
@@ -95,6 +110,32 @@ public theorem conditionalCaseProb_add_const {M K : ℕ} (α : ℝ) (β : Fin K 
     conditionalCaseProb α β (fun i => x i + z) j = conditionalCaseProb α β x j := by
   simp_rw [conditionalCaseProb_eq, dotProduct_add, Real.exp_add, ← Finset.sum_mul]
   exact mul_div_mul_right _ _ (Real.exp_pos (β ⬝ᵥ z)).ne'
+
+/-- **Two forms of the conditional likelihood of independent matched sets.** For `n` matched
+sets, set `s` having `M_s + 1` subjects with exposures `x_{s,j} ∈ ℝ^K` and its case listed first
+(`j = 0`), and every coefficient vector `β`, `∏_s exp(β · x_{s,0}) / ∑_j exp(β · x_{s,j})` equals
+`∏_s 1 / (1 + ∑_{j ≥ 1} exp(β · (x_{s,j} - x_{s,0})))` (Breslow and Day 1980, (7.2), (7.3)); for
+`M_s = 1` this is (7.3). The identity is algebraic. Each factor of the first product is the
+conditional probability that the case of set `s` is subject `0` (`conditionalCaseProb_eq`), and the
+product is the joint conditional likelihood of the `n` sets only when the outcomes are independent
+across sets as well as within each set: independence within each set does not justify
+multiplying probabilities across sets.
+
+Source: Breslow and Day (1980), p. 251, (7.2), and p. 253, (7.3). -/
+public theorem prod_conditionalLikelihood_eq {n K : ℕ} (M : Fin n → ℕ) (β : Fin K → ℝ)
+    (x : (s : Fin n) → Fin (M s + 1) → Fin K → ℝ) :
+    ∏ s, Real.exp (β ⬝ᵥ x s 0) / ∑ j, Real.exp (β ⬝ᵥ x s j) =
+      ∏ s, 1 / (1 + ∑ j : Fin (M s), Real.exp (β ⬝ᵥ (x s j.succ - x s 0))) := by
+  refine Finset.prod_congr rfl fun s _ => ?_
+  have hcase := (Real.exp_pos (β ⬝ᵥ x s 0)).ne'
+  -- Divide both parts of each fraction by the case's positive weight.
+  calc
+    _ = (Real.exp (β ⬝ᵥ x s 0) / Real.exp (β ⬝ᵥ x s 0)) /
+        ((∑ j, Real.exp (β ⬝ᵥ x s j)) / Real.exp (β ⬝ᵥ x s 0)) :=
+      (div_div_div_cancel_right₀ hcase _ _).symm
+    _ = _ := by
+      rw [Fin.sum_univ_succ, add_div, div_self hcase, Finset.sum_div]
+      simp only [dotProduct_sub, Real.exp_sub]
 
 /-- **Incidental-parameter log-likelihood of independent pairs.** The log-likelihood of the
 discordant pairs, with a separate nuisance intercept for every pair (not a valid estimating

@@ -84,3 +84,42 @@ example : perPairInterceptLogLik ![0, Real.log 2] (fun _ : Fin 1 => 0) 0 ≤
       (2 * Real.log 2) := by
   simpa using perPairInterceptLogLik_le (n₁₀ := 2) (n₀₁ := 1) (by decide) (by decide)
     ![0, Real.log 2] (fun _ => 0) 0
+
+private def controlCount : Fin 3 → ℕ := Fin.cases 1 (Fin.cases 2 fun _ => 0)
+
+private noncomputable def matchedExposure (s : Fin 3) (j : Fin (controlCount s + 1))
+    (_ : Fin 1) : ℝ :=
+  Real.log ((Fin.cases (motive := fun s => Fin (controlCount s + 1) → ℝ)
+    ![2, 8] (Fin.cases ![6, 3, 9] (fun _ _ => 7)) s) j)
+
+-- Independently evaluate both formulas at β = 1. The three sets have respectively
+-- one, two and zero controls, with case and control weights (2, 8), (6, 3, 9) and (7).
+example :
+    (∏ s, Real.exp ((fun _ => (1 : ℝ)) ⬝ᵥ matchedExposure s 0) /
+      ∑ j, Real.exp ((fun _ => (1 : ℝ)) ⬝ᵥ matchedExposure s j)) = 1 / 15 ∧
+    (∏ s, 1 / (1 + ∑ j : Fin (controlCount s),
+      Real.exp ((fun _ => (1 : ℝ)) ⬝ᵥ (matchedExposure s j.succ - matchedExposure s 0)))) =
+      1 / 15 := by
+  constructor
+  · rw [Fin.prod_univ_succ (n := 2), Fin.prod_univ_succ (n := 1), Fin.prod_univ_one]
+    simp only [dotProduct, Fin.sum_univ_one, one_mul]
+    change (Real.exp (Real.log 2) / ∑ j : Fin 2, Real.exp (Real.log (![2, 8] j))) *
+      ((Real.exp (Real.log 6) / ∑ j : Fin 3, Real.exp (Real.log (![6, 3, 9] j))) *
+      (Real.exp (Real.log 7) / ∑ _ : Fin 1, Real.exp (Real.log 7))) = _
+    norm_num [Fin.sum_univ_one, Fin.sum_univ_two, Fin.sum_univ_three, Real.exp_log]
+  · rw [Fin.prod_univ_succ (n := 2), Fin.prod_univ_succ (n := 1), Fin.prod_univ_one]
+    simp only [dotProduct_sub, Real.exp_sub]
+    simp only [dotProduct, Fin.sum_univ_one, one_mul]
+    change (1 / (1 + ∑ j : Fin 1, Real.exp (Real.log (![2, 8] j.succ)) / Real.exp (Real.log 2))) *
+      ((1 / (1 + ∑ j : Fin 2, Real.exp (Real.log (![6, 3, 9] j.succ)) / Real.exp (Real.log 6))) *
+      (1 / (1 + ∑ _ : Fin 0, Real.exp (Real.log 7) / Real.exp (Real.log 7)))) = _
+    norm_num [Fin.sum_univ_zero, Fin.sum_univ_one, Fin.sum_univ_two, Real.exp_log]
+
+-- Client example: a case with no controls has the same likelihood in both forms.
+example :
+    (∏ _ : Fin 1, Real.exp ((fun _ : Fin 1 => (1 : ℝ)) ⬝ᵥ (fun _ => Real.log 7)) /
+      ∑ _ : Fin 1, Real.exp ((fun _ : Fin 1 => (1 : ℝ)) ⬝ᵥ (fun _ => Real.log 7))) =
+      ∏ _ : Fin 1, 1 / (1 + ∑ _ : Fin 0, Real.exp 0) := by
+  simpa only [sub_self, dotProduct_zero] using
+    prod_conditionalLikelihood_eq (fun _ : Fin 1 => 0) (fun _ : Fin 1 => 1)
+      (fun _ _ _ => Real.log 7)
