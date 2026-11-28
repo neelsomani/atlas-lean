@@ -27,16 +27,22 @@ import Mathlib.Tactic.NormNum
 
 Greedy division by the mixed Pell place values produces a representation of every positive
 integer. Bounds on lower partial sums imply the digit caps and excluded neighboring patterns.
+The alternating place values satisfy a three-term recurrence at each parity.
 
-Source: Michael Fisher, Keith Hazen, and Craig Tennenhouse, *Olympic Games: Three Impartial
-Games with Infinite Octal Codes*, INTEGERS 24 (2024), Article G3, Theorem 4.
+## References
+
+* Michael Fisher, Keith Hazen, and Craig Tennenhouse, *Olympic Games: Three Impartial Games with
+  Infinite Octal Codes*, INTEGERS 24 (2024), Article G3, pp. 1–38, Section 3 and Theorem 4.
 -/
 
 namespace MetaMathlibExt
 
 open Finset
 
-private lemma pell_pair (n : ℕ) :
+/-- **Successive Pell and half-companion Pell numbers.** If $P_n$ and $H_n$ are the Pell and
+half-companion Pell numbers, then $H_n+P_n=P_{n+1}$ and $H_{n+1}=P_{n+1}+P_n$ for each natural
+number $n$. -/
+public lemma pellLucasSequence_pellNumber_succ (n : ℕ) :
     pellLucasSequence n + pellNumber n = pellNumber (n + 1) ∧
       pellLucasSequence (n + 1) = pellNumber (n + 1) + pellNumber n := by
   induction n with
@@ -48,14 +54,18 @@ private lemma pell_pair (n : ℕ) :
       pellLucasSequence (n + 2) = pellNumber (n + 2) + pellNumber (n + 1)
     omega
 
-private lemma mixed_recurrence (R : ℕ → ℕ)
+/-- **Three-term recurrences for doubled Pell and half-companion Pell weights.** If $R_j$ is
+$2P_j$ for odd $j$ and $H_j$ for even $j$, with $P$ and $H$ the Pell and half-companion Pell
+sequences, then $R_{2k+2}+R_{2k}=2R_{2k+1}$ and $R_{2k+3}+R_{2k+1}=4R_{2k+2}$ for every natural
+number $k$. -/
+public lemma two_pell_halfCompanion_place_recurrence (R : ℕ → ℕ)
     (hR : ∀ k, R k = if k % 2 = 1 then 2 * pellNumber k else pellLucasSequence k)
     (k : ℕ) :
     R (2 * k + 2) + R (2 * k) = 2 * R (2 * k + 1) ∧
       R (2 * k + 3) + R (2 * k + 1) = 4 * R (2 * k + 2) := by
-  have hp := pell_pair (2 * k)
-  have hp₁ := pell_pair (2 * k + 1)
-  have hp₂ := pell_pair (2 * k + 2)
+  have hp := pellLucasSequence_pellNumber_succ (2 * k)
+  have hp₁ := pellLucasSequence_pellNumber_succ (2 * k + 1)
+  have hp₂ := pellLucasSequence_pellNumber_succ (2 * k + 2)
   have hr₁ : pellNumber (2 * k + 2) =
       2 * pellNumber (2 * k + 1) + pellNumber (2 * k) := rfl
   have hr₂ : pellNumber (2 * k + 3) =
@@ -72,8 +82,8 @@ private lemma mixed_growth (R : ℕ → ℕ)
   induction k with
   | zero => norm_num [hR, pellNumber, pellLucasSequence]
   | succ k ih =>
-    have h₁ := mixed_recurrence R hR k
-    have h₂ := mixed_recurrence R hR (k + 1)
+    have h₁ := two_pell_halfCompanion_place_recurrence R hR k
+    have h₂ := two_pell_halfCompanion_place_recurrence R hR (k + 1)
     simp only [Nat.mul_add, Nat.mul_one, Nat.add_assoc, Nat.reduceAdd] at *
     omega
 
@@ -138,7 +148,7 @@ private lemma mixed_previous (R : ℕ → ℕ)
     (k : ℕ) (hk : 1 ≤ k) :
     R (2 * k) + R (2 * k - 2) = 2 * R (2 * k - 1) ∧
       R (2 * k + 1) + R (2 * k - 1) = 4 * R (2 * k) := by
-  have h := mixed_recurrence R hR (k - 1)
+  have h := two_pell_halfCompanion_place_recurrence R hR (k - 1)
   have h₀ : 2 * (k - 1) = 2 * k - 2 := by omega
   have h₁ : 2 * (k - 1) + 1 = 2 * k - 1 := by omega
   have h₂ : 2 * (k - 1) + 2 = 2 * k := by omega
@@ -164,7 +174,7 @@ private lemma digit_conditions (R : ℕ → ℕ)
     omega
   have hbound (k : ℕ) : a (2 * k) ≤ 3 ∧ a (2 * k + 1) ≤ 1 := by
     have hg := mixed_growth R hR k
-    have hr := mixed_recurrence R hR k
+    have hr := two_pell_halfCompanion_place_recurrence R hR k
     constructor
     · have h := prefix_single R a ha (2 * k)
       by_contra! hb
@@ -177,7 +187,7 @@ private lemma digit_conditions (R : ℕ → ℕ)
       omega
   have hnext (k : ℕ) (hk : a (2 * k) = 3) : a (2 * k + 1) = 0 := by
     have hg := mixed_growth R hR k
-    have hr := mixed_recurrence R hR k
+    have hr := two_pell_halfCompanion_place_recurrence R hR k
     have h := prefix_pair R a ha (2 * k) (2 * k + 1) (by omega)
     simp only [hk, Nat.add_assoc, Nat.reduceAdd] at h
     by_contra! hn
@@ -185,7 +195,7 @@ private lemma digit_conditions (R : ℕ → ℕ)
     omega
   have hpair (k : ℕ) (hk : a (2 * k) = 3) : a (2 * k + 2) < 3 := by
     have hg := mixed_growth R hR k
-    have hr := mixed_recurrence R hR k
+    have hr := two_pell_halfCompanion_place_recurrence R hR k
     have h := prefix_pair R a ha (2 * k) (2 * k + 2) (by omega)
     simp only [hk, Nat.add_assoc, Nat.reduceAdd] at h
     by_contra! hn

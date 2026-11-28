@@ -22,6 +22,7 @@ public import MathlibExt.NumberTheory.PellSilverRatio
 public import MathlibExt.NumberTheory.OlympicGamesNumerationExistsPellHalfCompanionRepresentation
 public import MathlibExt.NumberTheory.OlympicGamesNumerationExistsTwoPellHalfCompanionRepresentation
 public import MathlibExt.NumberTheory.OlympicGamesNumerationFloorGreedyBronzeCompanionSumMul
+public import MathlibExt.NumberTheory.OlympicGamesNumerationFloorGreedyTwoPell
 
 /-!
 # Fibonacci and Pell numeration identities from the Olympic games
@@ -122,25 +123,6 @@ theorem_wanted floor_greedy_pell_halfCompanion_sum_mul_one_add_sqrt_two (R R' : 
     (ha : ∀ m, 1 ≤ m → m ≤ n + 1 → ∑ k ∈ Ico 1 m, a k * R k < R m) :
     ⌊((∑ k ∈ Icc 1 n, a k * R k : ℕ) : ℝ) * (1 + Real.sqrt 2)⌋₊ =
       ∑ k ∈ Icc 1 n, a k * R' (k + 1)
-
-/-- **Floor of greedy sums of $2P_k$ and $H_k$ times $(2 + \sqrt 2)/2$.** Let $P_k$ be the Pell
-numbers and $H_k$ the Pell–Lucas numbers ($H_0 = H_1 = 1$, $H_{k+2} = 2H_{k+1} + H_k$). Put
-$R_k = 2P_k$ and $R'_k = P_k$ for odd $k$, and $R_k = R'_k = H_k$ for even $k$. Let $n$ be a
-natural number and $a_0, a_1, \dots$ natural numbers such that $\sum_{k<m} a_k R_k < R_m$ for
-every $m \le n + 1$, and let $t = \sum_{k=0}^{n} a_k R_k$. Then
-$\lfloor t(2 + \sqrt 2)/2 \rfloor = \sum_{k=0}^{n} a_k R'_{k+1}$.
-
-The hypothesis says that the $a_k$ are the digits of the greedy representation of $t$ by the
-$R_k$; $n$ need not be minimal.
-
-Source: Michael Fisher, Keith Hazen, and Craig Tennenhouse, *Olympic Games: Three Impartial
-Games with Infinite Octal Codes*, INTEGERS 24 (2024), Article G3, Theorem 6 (2). -/
-theorem_wanted floor_greedy_two_pell_halfCompanion_sum_mul (R R' : ℕ → ℕ)
-    (hR : ∀ k, R k = if k % 2 = 1 then 2 * pellNumber k else pellLucasSequence k)
-    (hR' : ∀ k, R' k = if k % 2 = 1 then pellNumber k else pellLucasSequence k)
-    (n : ℕ) (a : ℕ → ℕ) (ha : ∀ m ≤ n + 1, ∑ k ∈ range m, a k * R k < R m) :
-    ⌊((∑ k ∈ range (n + 1), a k * R k : ℕ) : ℝ) * ((2 + Real.sqrt 2) / 2)⌋₊ =
-      ∑ k ∈ range (n + 1), a k * R' (k + 1)
 
 /-- **P-positions of the silver game.** Let $P_n$ be the Pell numbers and $H_n$ the Pell–Lucas
 numbers ($H_0 = H_1 = 1$, $H_{n+2} = 2H_{n+1} + H_n$). In the silver game a heap of $n$ tokens
