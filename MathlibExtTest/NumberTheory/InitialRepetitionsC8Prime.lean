@@ -8,12 +8,13 @@ LICENSE file in the root directory of this source tree.
 
 module
 
+import Mathlib.Tactic.NormNum.IsSquare
+meta import MathlibExt.NumberTheory.InitialRepetitionsC8Prime
 import MathlibExt.NumberTheory.InitialRepetitionsC8Prime
-import MathlibExt.Combinatorics.Enumerative.Partition.Counting
 
 /-! # Tests for the partition function `c₈'` with a possibly distinguished part -/
 
-open MetaMathlibExt Finset
+open MetaMathlibExt
 
 -- The least allowed prime: 15 · 1 + 4 = 19 is 5 modulo 7, a nonsquare.
 example (n : ℕ) : Even (initialRepetitionsC8Prime (7 * n + 1)) :=
@@ -28,21 +29,12 @@ example : Even (initialRepetitionsC8Prime 5) :=
 -- At residue 3 the value 15 · 3 + 4 = 49 vanishes modulo 7, so it counts as a square.
 example : IsSquare ((15 * 3 + 4 : ℕ) : ZMod 7) := ⟨0, by decide⟩
 
--- The hypothesis cannot be dropped: `c₈'(3) = 1` is odd. The only partition counted is `2 + 1`,
--- with `m = 1`; neither `3` nor `1 + 1 + 1` qualifies.
-example : initialRepetitionsC8Prime 3 = 1 := by
-  let p3 : Nat.Partition 3 := ⟨{3}, by simp, by decide⟩
-  let p21 : Nat.Partition 3 := ⟨{2, 1}, by simp, by decide⟩
-  let p111 : Nat.Partition 3 := ⟨{1, 1, 1}, by simp, by decide⟩
-  have hne : p3 ≠ p21 ∧ p3 ≠ p111 ∧ p21 ≠ p111 := by decide +revert
-  have h2 := Nat.Partition.mul_card_eq_sum 2
-  have h3 := Nat.Partition.mul_card_eq_sum 3
-  simp [show Icc 1 2 = {1, 2} by decide, show Icc 1 3 = {1, 2, 3} by decide] at h2 h3
-  have hU : ({p3, p21, p111} : Finset (Nat.Partition 3)) = univ := by
-    apply eq_of_subset_of_card_le (subset_univ _)
-    rw [card_univ, card_insert_of_notMem (by simp [hne.1, hne.2.1]), card_pair hne.2.2]
-    omega
-  unfold initialRepetitionsC8Prime
-  rw [← hU]
-  dsimp only [p3, p21, p111]
-  decide
+-- Count independently of the parity theorem: {2} is counted twice, once with 2 distinguished.
+#guard initialRepetitionsC8Prime 2 == 2
+
+-- With a square discriminant the count can be odd. Only {2, 1}, with 2 distinguished, qualifies.
+#guard initialRepetitionsC8Prime 3 == 1
+
+-- The nonsquare criterion applies at N = 2, where 15 · 2 + 4 = 34.
+example : Even (initialRepetitionsC8Prime 2) :=
+  initialRepetitionsC8Prime_even_of_not_isSquare 2 (by norm_num)

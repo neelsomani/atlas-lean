@@ -21,11 +21,12 @@ import MathlibExt.Combinatorics.Enumerative.GaussianBinomial
 import MathlibExt.NumberTheory.DivisorCountParity
 
 /-!
-# Parity of $c_8'$ on residue classes modulo a prime
+# Parity of the initial-repetitions partition function $c_8'$
 
-The partition function $c_8'$ counts partitions with a possibly distinguished part. The main
-result, `MetaMathlibExt.initialRepetitionsC8Prime_prime_mul_add_even`, says that $c_8'(pn + r)$ is
-even for every $n \ge 0$ when $p \ge 7$ is a prime and $15r + 4$ is not a square modulo $p$.
+The partition function $c_8'$ counts partitions with a possibly distinguished part. The count
+$c_8'(N)$ is even for every $N \ge 0$ such that $15N + 4$ is not a square. In particular,
+$c_8'(pn + r)$ is even for every $n \ge 0$ when $p \ge 7$ is prime, $1 \le r \le p - 1$,
+and $15r + 4$ is not a square modulo $p$.
 
 For a fixed index $m$, first remove one copy of each of the compulsory parts $2, 4, \dots, 2m$.
 The remaining parts form a subset of the optional parts. Modulo two, the generating series of
@@ -38,8 +39,18 @@ $x \equiv 1 \pmod 6$ and $y \equiv 3 \pmod{10}$. Two involutions show that this 
 when $15N + 4$ is not a perfect square, and the prime-progression statement follows by reducing
 a square modulo $p$.
 
-The argument is the one used for $c_8$ in `MathlibExt.NumberTheory.InitialRepetitionsC8`, with the
-second Rogers–Ramanujan identity in place of the first.
+## References
+
+* John Greene and James A. Sellers, *Extending Recent Parity Results of Nyirenda and
+  Mugwangwavari for Partitions with Initial Repetitions*, INTEGERS 25 (2025), Article A32,
+  pp. 1–12, Section 4, Theorem 13 and Corollary 4.
+  <https://math.colgate.edu/~integers/z32/z32.pdf>
+* G. E. Andrews, *Euler's “exemplum memorabile inductionis fallacis” and q-trinomial coefficients*,
+  Journal of the American Mathematical Society 3, no. 3 (1990), pp. 653–669, equation (6.23).
+  This is the dissection Greene and Sellers cite in their proof. The argument here instead uses
+  the second Rogers–Ramanujan identity and adapts the proof of
+  `MetaMathlibExt.initialRepetitionsC8_even_of_not_isSquare` in
+  `MathlibExt.NumberTheory.InitialRepetitionsC8`.
 -/
 
 namespace MetaMathlibExt
@@ -1077,19 +1088,24 @@ private theorem thetaPairs_card (N : ℕ) : (thetaPairs N).card = (degreePairs N
     change (u x, v y) = (a, b)
     congr 1 <;> omega
 
-/-- The general nonsquare parity statement behind the prime-progression theorem. -/
-private theorem even_of_not_isSquare (N : ℕ) (hN : ¬ IsSquare (15 * N + 4)) :
+end initialRepetitionsC8Prime_prime_mul_add_even
+
+open initialRepetitionsC8Prime_prime_mul_add_even in
+/-- **$c_8'(N)$ is even when $15N + 4$ is not a square.** Let $c_8'$ be the partition function
+that counts partitions with a possibly distinguished part. For every integer $N \ge 0$ such that
+$15N + 4$ is not a perfect square, $c_8'(N)$ is even.
+
+Source: John Greene and James A. Sellers, *Extending Recent Parity Results of Nyirenda and
+Mugwangwavari for Partitions with Initial Repetitions*, INTEGERS 25 (2025), Article A32,
+Theorem 13 (`integers-2025-A32-thm-13`). -/
+public theorem initialRepetitionsC8Prime_even_of_not_isSquare (N : ℕ)
+    (hN : ¬ IsSquare (15 * N + 4)) :
     Even (initialRepetitionsC8Prime N) := by
   obtain ⟨k, hk⟩ := even_thetaPairs hN
   have h := c8p_degreePairs N
   rw [← thetaPairs_card, hk, Nat.cast_add, CharTwo.add_self_eq_zero] at h
   exact ZMod.natCast_eq_zero_iff_even.mp h
 
-end initialRepetitionsC8Prime_prime_mul_add_even
-
--- The modular reduction also works without the bounds on the prime and residue.
-set_option linter.unusedVariables false in
-open initialRepetitionsC8Prime_prime_mul_add_even in
 /-- **Parity of $c_8'$ on residue classes modulo a prime.** Let $c_8'$ be the partition function
 that counts partitions with a possibly distinguished part. Let $p \ge 7$ be a prime and let $r$ be
 an integer with $1 \le r \le p - 1$ such that $15r + 4$ is not a square modulo $p$. Then
@@ -1105,10 +1121,19 @@ public theorem initialRepetitionsC8Prime_prime_mul_add_even (p r n : ℕ) (hp : 
     (hp7 : 7 ≤ p) (hr : r ∈ Finset.Icc 1 (p - 1))
     (h15 : ¬ IsSquare ((15 * r + 4 : ℕ) : ZMod p)) :
     Even (initialRepetitionsC8Prime (p * n + r)) := by
-  apply even_of_not_isSquare
+  apply initialRepetitionsC8Prime_even_of_not_isSquare
   rintro ⟨x, hx⟩
+  have : NeZero p := ⟨hp.ne_zero⟩
+  have hrp : r < p := (Finset.mem_Icc.mp hr).2.trans_lt
+    (Nat.sub_lt ((by decide : 0 < 7).trans_le hp7) Nat.one_pos)
+  have hcast : ((p * n + r : ℕ) : ZMod p) = r := by
+    apply ZMod.val_injective p
+    rw [ZMod.val_natCast, Nat.mul_add_mod, Nat.mod_eq_of_lt hrp, ZMod.val_natCast_of_lt hrp]
   apply h15
   refine ⟨(x : ZMod p), ?_⟩
-  simpa using congrArg (fun a : ℕ => (a : ZMod p)) hx
+  calc
+    ((15 * r + 4 : ℕ) : ZMod p) = ↑(15 * (p * n + r) + 4 : ℕ) := by
+      rw [Nat.cast_add, Nat.cast_add, Nat.cast_mul, Nat.cast_mul, hcast]
+    _ = (x : ZMod p) * x := by rw [← Nat.cast_mul, hx]
 
 end MetaMathlibExt
