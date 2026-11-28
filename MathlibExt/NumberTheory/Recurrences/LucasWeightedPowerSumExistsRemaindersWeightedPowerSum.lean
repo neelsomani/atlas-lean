@@ -15,21 +15,34 @@ public import MathlibExt.NumberTheory.Recurrences.LucasRootPower
 public import Mathlib.Analysis.SpecialFunctions.Log.Base
 public import Mathlib.NumberTheory.Padics.PadicVal.Basic
 import Mathlib.Algebra.BigOperators.Intervals
+import Mathlib.Algebra.Ring.GeomSum
 import Mathlib.Tactic.FieldSimp
 import Mathlib.Tactic.Linarith
 import Mathlib.Tactic.NormNum
 import Mathlib.Tactic.Ring
 import MathlibExt.NumberTheory.Recurrences.LucasBinetFormula
+import MathlibExt.NumberTheory.Recurrences.LucasWeightedPowerSumAlphaBounds
 
 /-!
 # Remainders for weighted Lucas power sums
 
-This module proves the existence of bounded remainders in the weighted power-sum equation
-for Lucas sequences.
+For positive integers $x,n,p,q$ and an integer $k \ge 3$ satisfying
+$\sum_{j=1}^k j U_j(x,y)^p = U_n(x,y)^q$, this module bounds the remainders in the
+Binet expansion when $y \in \{1,-1\}$ and $D = x^2 - 4y > 0$.
+When $y=-1$, it also bounds the explicit remainder for $U_n^q$ by comparing the weighted sum
+with a geometric sum of powers of the dominant root. This uses the weak exponent comparison
+$4/q \le p+3$, which includes $p=q=1$.
 
-Source: Benjamin Earp-Lynch, Simon Earp-Lynch, Omar Kihel and Puntani Pongsumpun,
-*Extension of the Equation `Σ_{j=1}^k j F_j^p = F_n^q` to a Family of Lucas Sequences*, The
-Fibonacci Quarterly 62 (2024), no. 3 (primary text: arXiv:2607.09105), Proposition 4.1.
+## References
+
+* Benjamin Earp-Lynch, Simon Earp-Lynch, Omar Kihel and Puntani Pongsumpun, *Extension of the
+  Equation $\sum_{j=1}^k j F_j^p = F_n^q$ to a Family of Lucas Sequences*, The Fibonacci Quarterly
+  62 (2024), no. 3, pp. 241–257, Proposition 4.1 and Lemma 4.2. The estimates for the index and the
+  weighted sum in Lemma 4.2 follow here from the dominant-root bounds of Lemma 2.2, via
+  `lucasU_lucasV_alpha_bounds`.
+* Krisztián Gueth, Florian Luca and László Szalay, *On a Diophantine equation involving powers of
+  Fibonacci numbers*, Proceedings of the Japan Academy, Series A, Mathematical Sciences 96
+  (2020), no. 4, pp. 33–37, Section 2 (the Fibonacci argument cited in Section 4 above).
 -/
 
 namespace MetaMathlibExt
@@ -622,5 +635,185 @@ public theorem exists_remainders_weighted_power_sum (P : LucasSequenceParams)
   have hh := equation_of_diff R₁ R₂ _ _ _ _ _ α k p q n hd hag hsplit hE
     (pow_ne_zero _ (by linarith : s ≠ 0)) (pow_ne_zero _ (by linarith : s ≠ 0))
   simpa only [hsp] using hh
+
+/-- **Remainder bound for weighted Lucas power sums when $y = -1$.** Let $x$ be a positive
+integer, let $(U_m)$ be the Lucas sequence with parameters $(x, -1)$, given by $U_0 = 0$,
+$U_1 = 1$ and $U_{m+2} = x U_{m+1} + U_m$, and let $D = x^2 + 4$ and $\alpha = (x + \sqrt{D})/2$.
+If positive integers $n$, $p$, $q$ and an integer $k \ge 3$ satisfy
+$\sum_{j=1}^k j U_j^p = U_n^q$, then the remainder $R_2 = U_n^q - \alpha^{nq}/D^{q/2}$ satisfies
+$D^{q/2} |R_2| < k (D + 1/x)^{q+1} \alpha^{kp - 2k/q + 1}$.
+
+Source: Benjamin Earp-Lynch, Simon Earp-Lynch, Omar Kihel and Puntani Pongsumpun, *Extension of the
+Equation ∑ j F_j^p = F_n^q to a Family of Lucas Sequences*, The Fibonacci Quarterly 62 (2024),
+no. 3, Lemma 4.2 (`fq-2024-earplynch07182024-lem-4.2`). -/
+public theorem remainder_bound_of_neg (P : LucasSequenceParams) (hyP : P.q = -1)
+    (hx : 0 < P.p) {n k p q : ℕ} (hn : 0 < n) (hp : 0 < p) (hq : 0 < q) (hk : 3 ≤ k)
+    (hsol : ∑ j ∈ Finset.Icc 1 k, (j : ℤ) * lucasU P j ^ p = lucasU P n ^ q) :
+    let D : ℝ := P.p ^ 2 - 4 * P.q
+    let α : ℝ := (P.p + Real.sqrt D) / 2
+    D ^ ((q : ℝ) / 2) * |(lucasU P n : ℝ) ^ q - α ^ (n * q) / D ^ ((q : ℝ) / 2)| <
+      k * (D + 1 / P.p) ^ (q + 1) * α ^ ((k : ℝ) * p - 2 * k / q + 1) := by
+  let x : ℝ := P.p
+  let D : ℝ := P.p ^ 2 - 4 * P.q
+  let s := Real.sqrt D
+  let α : ℝ := (x + s) / 2
+  let β : ℝ := (x - s) / 2
+  let U (j : ℕ) : ℝ := lucasU P j
+  change D ^ ((q : ℝ) / 2) * |U n ^ q - α ^ (n * q) / D ^ ((q : ℝ) / 2)| <
+    k * (D + 1 / x) ^ (q + 1) * α ^ ((k : ℝ) * p - 2 * k / q + 1)
+  have hx' : 1 ≤ P.p := by omega
+  have hx1 : 1 ≤ x := by dsimp only [x]; exact_mod_cast hx'
+  have hx0 : 0 < x := zero_lt_one.trans_le hx1
+  have hD : 0 < P.p ^ 2 - 4 * P.q := by rw [hyP]; nlinarith [sq_nonneg P.p]
+  have hD0 : 0 < D := by dsimp only [D]; exact_mod_cast hD
+  obtain ⟨hs, hs2, hα, _, hsum, hprod, hdiff, hab, _⟩ := root_data P (Or.inr hyP) hx hD
+  change α + β = x at hsum
+  change α * β = (P.q : ℝ) at hprod
+  change α - β = s at hdiff
+  change |β| * α = 1 at hab
+  have hα1 : 1 < α := by change 3 / 2 < α at hα; linarith
+  have hα0 : 0 < α := zero_lt_one.trans hα1
+  change 2 < s at hs
+  have hs0 : 0 < s := by linarith
+  have hBinet : U n = (α ^ n - β ^ n) / s := by
+    have hne : α ≠ β := sub_ne_zero.mp (hdiff.symm ▸ hs0.ne')
+    simpa only [hdiff] using ((lucas_binet_formulas_of_field P α β hsum hprod).1 hne n).1
+  have hrem := power_remainder_bound P α β s n q hn hq hα hs hs2 hab hBinet
+  rw [Real.rpow_div_two_eq_sqrt (q : ℝ) hD0.le, Real.rpow_natCast]
+  change s ^ q * |U n ^ q - α ^ (n * q) / s ^ q| < _
+  have hterms (j : ℕ) (hj : 2 ≤ j) : x * α ^ (j - 2) ≤ U j ∧ U j ≤ α ^ (j - 1) := by
+    have hy : |P.q + 1| ≤ P.p := by rw [hyP, neg_add_cancel, abs_zero]; exact hx.le
+    have hb := lucasU_lucasV_alpha_bounds P hx' hy hD hj
+    exact ⟨hb.1, hb.2.1 (by rw [hyP]; decide)⟩
+  have hUone : U 1 = 1 := by
+    have h : lucasU P 1 = 1 := by simpa using lucasU_eq_sum_choose P (r := 1) (by decide)
+    dsimp only [U]
+    exact_mod_cast h
+  have hU (j : ℕ) (hj : 1 ≤ j) : 1 ≤ U j ∧ U j ≤ α ^ (j - 1) := by
+    by_cases h : j = 1
+    · subst j
+      simp only [hUone, Nat.sub_self, pow_zero, le_refl, and_self]
+    · obtain ⟨hl, hu⟩ := hterms j (by omega)
+      exact ⟨(one_le_mul_of_one_le_of_one_le hx1 (one_le_pow₀ hα1.le)).trans hl, hu⟩
+  have hsol' : ∑ j ∈ Finset.Icc 1 k, (j : ℝ) * U j ^ p = U n ^ q := by
+    dsimp only [U]
+    exact_mod_cast hsol
+  have hk1 : (1 : ℝ) < k := by exact_mod_cast (show 1 < k by omega)
+  have hlast : α ^ (k - 2) < U n ^ q := calc
+    _ ≤ x * α ^ (k - 2) := le_mul_of_one_le_left (by positivity) hx1
+    _ ≤ U k := (hterms k (by omega)).1
+    _ ≤ U k ^ p := by simpa only [pow_one] using pow_le_pow_right₀ (hU k (by omega)).1 hp
+    _ < (k : ℝ) * U k ^ p := lt_mul_of_one_lt_left (by positivity [(hU k (by omega)).1]) hk1
+    _ ≤ U n ^ q := by
+      rw [← hsol']
+      refine Finset.single_le_sum (f := fun j : ℕ => (j : ℝ) * U j ^ p)
+        (fun j hj => mul_nonneg (Nat.cast_nonneg _) ?_)
+        (Finset.mem_Icc.mpr ⟨by omega, le_rfl⟩)
+      exact pow_nonneg (zero_le_one.trans (hU j (Finset.mem_Icc.mp hj).1).1) _
+  have hn2 : 2 ≤ n := by
+    by_contra! hn2
+    have h : n = 1 := by omega
+    rw [h, hUone, one_pow] at hlast
+    exact (not_lt_of_ge (one_le_pow₀ hα1.le)) hlast
+  have hindex : k - 2 < (n - 1) * q := by
+    apply (pow_lt_pow_iff_right₀ hα1).mp
+    rw [pow_mul]
+    exact hlast.trans_le (pow_le_pow_left₀ (by positivity [(hU n (by omega)).1]) (hterms n hn2).2 q)
+  -- Dominate each weight by k and sum the resulting geometric progression.
+  let a := α ^ p
+  have ha : 3 / 2 < a := hα.trans_le (by simpa only [pow_one] using pow_le_pow_right₀ hα1.le hp)
+  have ha0 : 0 < a := by linarith
+  have hgeom : (∑ j ∈ Finset.Icc 1 k, a ^ (j - 1)) < 3 * a ^ (k - 1) := by
+    rw [← Finset.Ico_add_one_right_eq_Icc, Finset.sum_Ico_eq_sum_range, Nat.add_sub_cancel]
+    simp only [Nat.add_sub_cancel_left]
+    apply (mul_lt_mul_iff_of_pos_right (show 0 < a - 1 by linarith)).mp
+    have hapow : a ^ k = a ^ (k - 1) * a := by rw [← pow_succ, Nat.sub_add_cancel (by omega)]
+    rw [geom_sum_mul, hapow]
+    nlinarith only [mul_lt_mul_of_pos_left (show a < 3 * (a - 1) by linarith)
+      (pow_pos ha0 (k - 1))]
+  have hweighted : U n ^ q < 3 * k * α ^ ((k - 1) * p) := calc
+    _ = ∑ j ∈ Finset.Icc 1 k, (j : ℝ) * U j ^ p := hsol'.symm
+    _ ≤ ∑ j ∈ Finset.Icc 1 k, (k : ℝ) * a ^ (j - 1) := by
+      refine Finset.sum_le_sum fun j hj => ?_
+      obtain ⟨hj1, hjk⟩ := Finset.mem_Icc.mp hj
+      obtain ⟨hl, hu⟩ := hU j hj1
+      have hpow : U j ^ p ≤ a ^ (j - 1) := by
+        simpa only [a, ← pow_mul, Nat.mul_comm p] using pow_le_pow_left₀ (zero_le_one.trans hl) hu p
+      exact mul_le_mul (by exact_mod_cast hjk) hpow (by positivity [hl]) (Nat.cast_nonneg k)
+    _ = k * ∑ j ∈ Finset.Icc 1 k, a ^ (j - 1) := (Finset.mul_sum _ _ _).symm
+    _ < k * (3 * a ^ (k - 1)) := mul_lt_mul_of_pos_left hgeom (zero_lt_one.trans hk1)
+    _ = 3 * k * α ^ ((k - 1) * p) := by
+      dsimp only [a]
+      rw [← pow_mul, Nat.mul_comm p]
+      ring
+  have hgrowth : x ^ q * α ^ ((n - 2) * q) < 3 * k * α ^ ((k - 1) * p) := by
+    rw [pow_mul, ← mul_pow]
+    exact (pow_le_pow_left₀ (by positivity) (hterms n hn2).1 q).trans_lt hweighted
+  -- Use α² - β² = sx and sβ² < 1 to bound the coefficient.
+  have hsquare : s ^ 2 = D := Real.sq_sqrt hD0.le
+  have hbase : s * α ^ 2 / x < D + 1 / x := by
+    have hβ : |β| < 1 := by
+      apply (mul_lt_mul_iff_of_pos_right hα0).mp
+      simpa only [hab, one_mul] using hα1
+    have hroot : α ^ 2 = x * α + 1 := by
+      have hneg : (P.q : ℝ) = -1 := by exact_mod_cast hyP
+      rw [hneg] at hprod
+      rw [← hsum]
+      nlinarith only [hprod]
+    have hslt : s < α ^ 2 := by
+      rw [← hdiff, hroot]
+      linarith only [neg_le_abs β, hβ, mul_le_mul_of_nonneg_right hx1 hα0.le]
+    have habsq : β ^ 2 * α ^ 2 = 1 := by
+      have h : (|β| * α) ^ 2 = (1 : ℝ) ^ 2 := congrArg (fun t : ℝ => t ^ 2) hab
+      simpa only [mul_pow, sq_abs, one_pow] using h
+    have hβterm : s * β ^ 2 < 1 := calc
+      _ < α ^ 2 * β ^ 2 := mul_lt_mul_of_pos_right hslt (sq_pos_of_ne_zero (by
+        intro h; simp [h] at hab))
+      _ = 1 := (mul_comm _ _).trans habsq
+    apply (div_lt_iff₀ hx0).mpr
+    calc
+      s * α ^ 2 = (s ^ 2) * x + s * β ^ 2 := by rw [← hsum, ← hdiff]; ring
+      _ < D * x + 1 := by linarith only [congrArg (· * x) hsquare, hβterm]
+      _ = (D + 1 / x) * x := by rw [add_mul, one_div, inv_mul_cancel₀ hx0.ne']
+  have hthree : 3 ≤ D + 1 / x := by
+    have hs2' : 5 ≤ s ^ 2 := hs2
+    have hinv : 0 ≤ 1 / x := by positivity
+    linarith only [hsquare, hs2', hinv]
+  have hq1 : (1 : ℝ) ≤ q := by exact_mod_cast hq
+  have hq0 : (0 : ℝ) < q := zero_lt_one.trans_le hq1
+  have hcut : (k : ℝ) - 2 < ((n : ℝ) - 1) * q := by
+    have h : (((k - 2 : ℕ) : ℝ)) < (((n - 1) * q : ℕ) : ℝ) := by exact_mod_cast hindex
+    simpa only [Nat.cast_mul, Nat.cast_sub (by omega : 2 ≤ k),
+      Nat.cast_sub (by omega : 1 ≤ n), Nat.cast_ofNat, Nat.cast_one] using h
+  have hexp : (((k - 1) * p : ℕ) : ℝ) + (-2 * (n : ℝ)) ≤ (k : ℝ) * p - 2 * k / q + 1 := by
+    have hdiv := (div_lt_iff₀ hq0).mpr hcut
+    rw [sub_div] at hdiv
+    have hp1 : (1 : ℝ) ≤ p := by exact_mod_cast hp
+    have h2 : 2 / (q : ℝ) ≤ 2 := (div_le_iff₀ hq0).mpr (by linarith only [hq1])
+    push_cast [Nat.cast_sub (by omega : 1 ≤ k)]
+    rw [mul_div_assoc]
+    linarith only [hdiv, hp1, h2]
+  calc
+    _ < s ^ q * α ^ ((n : ℝ) * ((q : ℝ) - 2)) := mul_lt_mul_of_pos_left hrem (pow_pos hs0 q)
+    _ = (s * α ^ 2 / x) ^ q * (x ^ q * α ^ ((n - 2) * q)) * α ^ (-2 * (n : ℝ)) := by
+      have he : (n : ℝ) * ((q : ℝ) - 2) = ((2 * q : ℕ) : ℝ) +
+          ((((n - 2) * q : ℕ) : ℝ) + (-2 * (n : ℝ))) := by
+        push_cast [Nat.cast_sub hn2]
+        ring
+      rw [he, Real.rpow_add hα0, Real.rpow_add hα0, Real.rpow_natCast, Real.rpow_natCast,
+        div_pow (s * α ^ 2) x q, mul_pow s (α ^ 2) q, ← pow_mul α 2 q]
+      field_simp
+    _ ≤ (D + 1 / x) ^ q * (3 * k * α ^ ((k - 1) * p)) * α ^ (-2 * (n : ℝ)) :=
+      mul_le_mul_of_nonneg_right
+        (mul_le_mul (pow_le_pow_left₀ (by positivity) hbase.le _) hgrowth.le
+          (by positivity) (by positivity)) (Real.rpow_nonneg hα0.le _)
+    _ = k * (D + 1 / x) ^ q * 3 * α ^ ((((k - 1) * p : ℕ) : ℝ) + (-2 * (n : ℝ))) := by
+      rw [Real.rpow_add hα0, Real.rpow_natCast]
+      ring
+    _ ≤ k * (D + 1 / x) ^ (q + 1) * α ^ ((k : ℝ) * p - 2 * k / q + 1) := by
+      rw [pow_succ, ← mul_assoc (k : ℝ)]
+      exact mul_le_mul (mul_le_mul_of_nonneg_left hthree (by positivity))
+        (Real.rpow_le_rpow_of_exponent_le hα1.le hexp) (by positivity) (by positivity)
+
 end
 end MetaMathlibExt
