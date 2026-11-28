@@ -55,69 +55,6 @@ set_option autoImplicit false
 
 namespace MathlibExt.GraphTheory.TournamentScoreSequenceWanted
 
-instance {n : ℕ} (T : Fin n → Fin n → Bool) :
-    Decidable (IsTournament T) :=
-  inferInstanceAs (Decidable ((∀ i, T i i = false) ∧
-    ∀ i j, i ≠ j → T i j ≠ T j i))
-
-instance {n : ℕ} (T : Fin n → Fin n → Bool) :
-    Decidable (IsReducible T) :=
-  inferInstanceAs (Decidable (∃ S : Finset (Fin n),
-    S.Nonempty ∧ S ≠ Finset.univ ∧
-      ∀ i ∈ S, ∀ j, j ∉ S → T i j = false))
-
-/-- The number of circular triads of a tournament.
-
-Source: Ian R. Harris and Ryan P. A. McShane, "Counting
-Tournaments with a Specified Number of Circular
-Triads", Journal of Integer Sequences 27 (2024), Article 24.8.7, Section 2. -/
-def circularTriadCount {n : ℕ} (T : Fin n → Fin n → Bool) :
-    ℕ :=
-  ((Finset.univ.powersetCard 3).filter
-    (IsCircularTriad T)).card
-
-/-- `g_d(n)`: the number of tournaments on the labeled
-players `Fin n` with exactly `d` circular triads.
-
-Source: Ian R. Harris and Ryan P. A. McShane, "Counting
-Tournaments with a Specified Number of Circular
-Triads", Journal of Integer Sequences 27 (2024), Article 24.8.7, Section 1. -/
-def tournamentCount (n d : ℕ) : ℕ :=
-  (Finset.univ.filter (fun T : Fin n → Fin n → Bool =>
-    IsTournament T ∧ circularTriadCount T = d)).card
-
-/-- `N(n, d)`: the number of non-trivial atoms
-(irreducible tournaments on `n ≥ 2` labeled players; the
-single-node atom is trivial) with exactly `d` circular
-triads.
-
-Source: Ian R. Harris and Ryan P. A. McShane, "Counting
-Tournaments with a Specified Number of Circular
-Triads", Journal of Integer Sequences 27 (2024), Article 24.8.7, Section 3. -/
-def atomCount (n d : ℕ) : ℕ :=
-  (Finset.univ.filter (fun T : Fin n → Fin n → Bool =>
-    IsTournament T ∧ ¬ IsReducible T ∧ 1 < n ∧
-      circularTriadCount T = d)).card
-
-/-- `g_0(3) = 6` (the transitive tournaments) and
-`g_1(3) = 2` (the two directed 3-cycles).
-
-Source: Ian R. Harris and Ryan P. A. McShane, "Counting
-Tournaments with a Specified Number of Circular
-Triads", Journal of Integer Sequences 27 (2024), Article 24.8.7, Section 1. -/
-theorem tournamentCount_three :
-    tournamentCount 3 0 = 6 ∧ tournamentCount 3 1 = 2 := by
-  decide +kernel
-
-/-- `N(3, 1) = 2`: the two circular triads are the atoms
-on three players (Table 1).
-
-Source: Ian R. Harris and Ryan P. A. McShane, "Counting
-Tournaments with a Specified Number of Circular
-Triads", Journal of Integer Sequences 27 (2024), Article 24.8.7, Section 3, Table 1. -/
-theorem atomCount_three_one : atomCount 3 1 = 2 := by
-  decide +kernel
-
 /-- The atomic generator `A_d(x) = ∑_n N(n, d) xⁿ / n!`.
 
 Source: Ian R. Harris and Ryan P. A. McShane, "Counting
@@ -159,27 +96,6 @@ theorem_wanted egf_mul (a b c : ℕ → ℕ)
     PowerSeries.mk (fun n => (c n : ℚ) / n.factorial) =
       PowerSeries.mk (fun n => (a n : ℚ) / n.factorial) *
         PowerSeries.mk (fun n => (b n : ℚ) / n.factorial)
-
-/-- **Theorem 8**: for `d ≥ 1`,
-`A_d(x) = ∑_{k=L(d)}^{d+2} N(k, d) x^k / k!`, where
-`L(d) = min(I_o(d), I_e(d))` with `I_o(d)` (`I_e(d)`) the
-least positive odd (even) integer solution of
-`x³ - x - 24d ≥ 0` (`x³ - 4x - 24d ≥ 0`). Stated as the
-equivalent support condition `N(k, d) ≠ 0 →
-L(d) ≤ k ≤ d + 2`, with `L(d) ≤ k` written as the
-existence of a positive `j ≤ k` solving the odd or the
-even inequality (both cubics increase on the positive
-integers).
-
-Source: Ian R. Harris and Ryan P. A. McShane, "Counting
-Tournaments with a Specified Number of Circular
-Triads", Journal of Integer Sequences 27 (2024), Article 24.8.7, Theorem 8
-(`jis-2024-24.8.7-thm-8`). -/
-theorem_wanted atomCount_ne_zero_bounds (d k : ℕ) (hd : 1 ≤ d)
-    (hk : atomCount k d ≠ 0) :
-    k ≤ d + 2 ∧ ∃ j : ℕ, 0 < j ∧ j ≤ k ∧
-      ((Odd j ∧ 24 * (d : ℤ) ≤ (j : ℤ) ^ 3 - j) ∨
-        (Even j ∧ 24 * (d : ℤ) ≤ (j : ℤ) ^ 3 - 4 * j))
 
 /-- **Theorem 10**: the exponential generating function
 `G_d(x) = ∑_n g_d(n) xⁿ / n!` of tournaments with `d`

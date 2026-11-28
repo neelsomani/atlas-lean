@@ -11,11 +11,16 @@ public import Mathlib.Algebra.BigOperators.Group.Finset.Basic
 public import Mathlib.Data.Finset.Powerset
 public import Mathlib.Data.Nat.Choose.Basic
 public import Mathlib.RingTheory.PowerSeries.Basic
+import Mathlib.Algebra.BigOperators.Module
 import Mathlib.Algebra.Order.BigOperators.Group.Finset
 import Mathlib.Combinatorics.Hall.Basic
+import Mathlib.Data.Fin.Tuple.Sort
 import Mathlib.Data.Finset.Sort
+import Mathlib.Data.Nat.Choose.Sum
 import Mathlib.Data.Sym.Card
 import Mathlib.RingTheory.PowerSeries.WellKnown
+import Mathlib.Tactic.Linarith
+import Mathlib.Tactic.Ring
 
 /-!
 # Tournament score sequences
@@ -35,6 +40,10 @@ sequences quoted by Harris and McShane:
   `k ≥ 1` sums to exactly `C(k, 2)`.
 * `card_circularTriads` (Theorem 6, Moon): a tournament has
   `C(n, 3) - ∑ i, C(s_i, 2)` circular triads.
+* `atomCount_ne_zero_bounds` (Theorem 8, support form): if `d ≥ 1` and
+  `atomCount k d ≠ 0`, then `k ≤ d + 2` and some positive `j ≤ k` satisfies
+  `24d ≤ j³ - j` for odd `j` or `24d ≤ j³ - 4j` for even `j`.
+  The proof takes `j = k`.
 
 Landau's theorem is deduced from the unsorted form
 `exists_isTournament_score_eq_iff`: `s` is a score sequence exactly when
@@ -52,12 +61,23 @@ players beats the other two, and then that player is unique
 (`card_filter_card_filter_eq_two`). Each player `i` beats both others in
 `C(score T i, 2)` of the `3`-sets (`card_filter_powersetCard_eq_choose`).
 
+For Theorem 8, every nonempty proper prefix of an atom's sorted scores
+has at least one win against its complement. Summation by parts then bounds
+its sum of squares by that of `(1, 1, 2, …, k - 2, k - 2)`. For the cubic
+bounds, the integer centered scores `2s_i - (k - 1)` have nonnegative
+squares; for even `k` they are odd, so each square is at least one.
+
 ## References
 
 * Ian R. Harris and Ryan P. A. McShane, "Counting Tournaments with a
   Specified Number of Circular Triads", *Journal of Integer Sequences* 27
-  (2024), Article 24.8.7
+  (2024), Article 24.8.7, Theorems 1, 4–6 and 8, and Appendix A
   (<https://cs.uwaterloo.ca/journals/JIS/VOL27/McShane/mcshane1.html>).
+* F. Harary and L. Moser, "The Theory of Round Robin Tournaments",
+  *American Mathematical Monthly* 73 (1966), 231–246; cited in Theorem 8
+  for the score sequence with the fewest circular triads.
+* M. G. Kendall and B. Babington Smith, "On the Method of Paired Comparisons",
+  *Biometrika* 31 (1940), 324–345; cited in Theorem 8 for the parity bounds.
 * H. G. Landau, "On dominance relations and the structure of animal
   societies. III. The condition for a score structure", *Bulletin of
   Mathematical Biophysics* 15 (1953), 143–148.
@@ -525,5 +545,292 @@ theorem card_circularTriads (n : ℕ)
           rw [← card_filter_powersetCard_eq_choose hT i, card_filter]
   have := card_filter_add_card_filter_not (s := A) (IsCircularTriad T)
   omega
+
+/-! ### Counting tournaments and atoms -/
+
+instance {n : ℕ} (T : Fin n → Fin n → Bool) :
+    Decidable (IsTournament T) :=
+  inferInstanceAs (Decidable ((∀ i, T i i = false) ∧
+    ∀ i j, i ≠ j → T i j ≠ T j i))
+
+instance {n : ℕ} (T : Fin n → Fin n → Bool) :
+    Decidable (IsReducible T) :=
+  inferInstanceAs (Decidable (∃ S : Finset (Fin n),
+    S.Nonempty ∧ S ≠ Finset.univ ∧
+      ∀ i ∈ S, ∀ j, j ∉ S → T i j = false))
+
+/-- The number of circular triads of a tournament.
+
+Source: Ian R. Harris and Ryan P. A. McShane, "Counting
+Tournaments with a Specified Number of Circular
+Triads", Journal of Integer Sequences 27 (2024), Article 24.8.7, Section 2. -/
+def circularTriadCount {n : ℕ} (T : Fin n → Fin n → Bool) :
+    ℕ :=
+  ((Finset.univ.powersetCard 3).filter
+    (IsCircularTriad T)).card
+
+/-- `g_d(n)`: the number of tournaments on the labeled
+players `Fin n` with exactly `d` circular triads.
+
+Source: Ian R. Harris and Ryan P. A. McShane, "Counting
+Tournaments with a Specified Number of Circular
+Triads", Journal of Integer Sequences 27 (2024), Article 24.8.7, Section 1. -/
+def tournamentCount (n d : ℕ) : ℕ :=
+  (Finset.univ.filter (fun T : Fin n → Fin n → Bool =>
+    IsTournament T ∧ circularTriadCount T = d)).card
+
+/-- `N(n, d)`: the number of non-trivial atoms
+(irreducible tournaments on `n ≥ 2` labeled players; the
+single-node atom is trivial) with exactly `d` circular
+triads.
+
+Source: Ian R. Harris and Ryan P. A. McShane, "Counting
+Tournaments with a Specified Number of Circular
+Triads", Journal of Integer Sequences 27 (2024), Article 24.8.7, Section 3. -/
+def atomCount (n d : ℕ) : ℕ :=
+  (Finset.univ.filter (fun T : Fin n → Fin n → Bool =>
+    IsTournament T ∧ ¬ IsReducible T ∧ 1 < n ∧
+      circularTriadCount T = d)).card
+
+/-- `g_0(3) = 6` (the transitive tournaments) and
+`g_1(3) = 2` (the two directed 3-cycles).
+
+Source: Ian R. Harris and Ryan P. A. McShane, "Counting
+Tournaments with a Specified Number of Circular
+Triads", Journal of Integer Sequences 27 (2024), Article 24.8.7, Section 1. -/
+theorem tournamentCount_three :
+    tournamentCount 3 0 = 6 ∧ tournamentCount 3 1 = 2 := by
+  decide +kernel
+
+/-- `N(3, 1) = 2`: the two circular triads are the atoms
+on three players (Table 1).
+
+Source: Ian R. Harris and Ryan P. A. McShane, "Counting
+Tournaments with a Specified Number of Circular
+Triads", Journal of Integer Sequences 27 (2024), Article 24.8.7, Section 3, Table 1. -/
+theorem atomCount_three_one : atomCount 3 1 = 2 := by
+  decide +kernel
+
+/-! ### Support of the atomic generators -/
+
+private theorem twice_choose_two (m : ℕ) :
+    2 * (m.choose 2 : ℤ) = (m : ℤ) ^ 2 - m := by
+  cases m with
+  | zero => decide
+  | succ m =>
+    have h := Nat.descFactorial_eq_factorial_mul_choose (m + 1) 2
+    simp only [Nat.descFactorial_succ, Nat.descFactorial_zero, Nat.add_sub_cancel,
+      Nat.sub_zero, mul_one] at h
+    have h' := congrArg (fun a : ℕ => (a : ℤ)) h
+    push_cast at h'
+    norm_num [Nat.factorial] at h'
+    rw [Nat.cast_succ]
+    nlinarith only [h']
+
+private theorem twice_card_add_sum_sq (hT : IsTournament T) (hc : 0 < circularTriadCount T) :
+    2 * (circularTriadCount T : ℤ) + ∑ i, (score T i : ℤ) ^ 2 =
+      2 * (n.choose 3 : ℤ) + (n.choose 2 : ℤ) := by
+  have hcard : circularTriadCount T = n.choose 3 - ∑ i, (score T i).choose 2 :=
+    card_circularTriads n T hT
+  have hle : ∑ i, (score T i).choose 2 ≤ n.choose 3 := by omega
+  have htri : (circularTriadCount T : ℤ) = (n.choose 3 : ℤ) -
+      ∑ i, ((score T i).choose 2 : ℤ) := by
+    rw [hcard, Nat.cast_sub hle, Nat.cast_sum]
+  have hsum : ∑ i, (score T i : ℤ) = (n.choose 2 : ℤ) := by
+    exact_mod_cast sum_score_eq_choose hT
+  have hsq : 2 * (∑ i, ((score T i).choose 2 : ℤ)) =
+      (∑ i, (score T i : ℤ) ^ 2) - ∑ i, (score T i : ℤ) := by
+    simp only [mul_sum, twice_choose_two, sum_sub_distrib]
+  linarith
+
+private theorem card_le_triads_add_two (hT : IsTournament T) (hI : ¬ IsReducible T)
+    (hc : 0 < circularTriadCount T) (hn : 3 ≤ n) : n ≤ circularTriadCount T + 2 := by
+  -- Compare the sorted scores with the sequence obtained from `0, …, n - 1`
+  -- by increasing the first entry by one and decreasing the last by one.
+  let e := Tuple.sort (score T)
+  let s : ℕ → ℤ := fun i => if hi : i < n then score T (e ⟨i, hi⟩) else 0
+  let b : ℕ → ℤ := fun i => (i : ℤ) + (if i = 0 then 1 else 0) -
+    (if i = n - 1 then 1 else 0)
+  have hsumSq : (∑ i ∈ range n, s i ^ 2) = ∑ i : Fin n, (score T i : ℤ) ^ 2 := by
+    rw [sum_range]
+    simpa [s] using Equiv.sum_comp e (fun i => (score T i : ℤ) ^ 2)
+  have hsum : (∑ i ∈ range n, s i) = (n.choose 2 : ℤ) := by
+    rw [sum_range]
+    calc
+      _ = ∑ i, (score T i : ℤ) := by
+        simpa [s] using Equiv.sum_comp e (fun i => (score T i : ℤ))
+      _ = _ := by exact_mod_cast sum_score_eq_choose hT
+  have hprefix {j : ℕ} (hj₀ : 0 < j) (hj : j < n) :
+      (j.choose 2 : ℤ) + 1 ≤ ∑ i ∈ range j, s i := by
+    let f := (Fin.castLEEmb hj.le).trans e.toEmbedding
+    let S := univ.map f
+    have hS : S.card = j := by simp [S]
+    have hcross : 0 < ∑ i ∈ S, #{x ∈ Sᶜ | T i x} := by
+      by_contra! hzero
+      rw [nonpos_iff_eq_zero, sum_eq_zero_iff] at hzero
+      refine hI ⟨S, card_pos.1 (hS ▸ hj₀), ?_, fun i hi x hx => ?_⟩
+      · intro h
+        rw [h, card_fin] at hS
+        omega
+      · have : x ∉ {x ∈ Sᶜ | T i x} := by
+          rw [card_eq_zero.1 (hzero i hi)]
+          exact notMem_empty x
+        simpa [hx] using this
+    have h := sum_score_eq_choose_add hT S
+    rw [hS] at h
+    have hle : j.choose 2 + 1 ≤ ∑ i ∈ S, score T i := by omega
+    rw [sum_map] at hle
+    rw [sum_range]
+    have hs : ∀ i : Fin j, s i = (score T (f i) : ℤ) := by
+      intro i
+      rw [show s i = (score T (e (Fin.castLE hj.le i)) : ℤ) by
+        simp only [s, dite_eq_left (i.isLt.trans hj)]; rfl]
+      rfl
+    simp only [hs, ← Nat.cast_sum]
+    exact_mod_cast hle
+  have hid (j : ℕ) : (∑ i ∈ range j, (i : ℤ)) = (j.choose 2 : ℤ) := by
+    rw [← Nat.cast_sum, sum_range_id, ← Nat.choose_two_right]
+  have hb {j : ℕ} (hj₀ : 0 < j) (hj : j ≤ n) :
+      (∑ i ∈ range j, b i) = (j.choose 2 : ℤ) + 1 - (if j = n then 1 else 0) := by
+    have hlast : n - 1 < j ↔ j = n := by omega
+    simp [b, sum_sub_distrib, sum_add_distrib, hid, hj₀, hlast]
+  have hmono {i : ℕ} (hi : i + 1 < n) : s i + b i ≤ s (i + 1) + b (i + 1) := by
+    have his : i < n := by omega
+    have hs := (Tuple.monotone_sort (score T))
+      (show (⟨i, his⟩ : Fin n) ≤ ⟨i + 1, hi⟩ from Nat.le_succ _)
+    have hs' : s i ≤ s (i + 1) := by
+      simpa [s, his, hi, e, Function.comp_apply] using hs
+    refine add_le_add hs' ?_
+    simp only [b, Nat.cast_add, Nat.cast_one]
+    split_ifs <;> omega
+  have hcomp : (∑ i ∈ range n, s i ^ 2) ≤ ∑ i ∈ range n, b i ^ 2 := by
+    have h := sum_range_by_parts (fun i => s i + b i) (fun i => s i - b i) n
+    have hzero : (∑ i ∈ range n, (s i - b i)) = 0 := by
+      rw [sum_sub_distrib, hsum, hb (by omega) le_rfl, ite_eq_left rfl]
+      ring
+    rw [hzero, smul_zero, zero_sub] at h
+    simp only [smul_eq_mul, ← sq_sub_sq, sum_sub_distrib] at h
+    have hnonneg : 0 ≤ ∑ i ∈ range (n - 1),
+        (s (i + 1) + b (i + 1) - (s i + b i)) * ∑ j ∈ range (i + 1), (s j - b j) := by
+      refine sum_nonneg fun i hi => ?_
+      have hi' : i + 1 < n := by have := mem_range.1 hi; omega
+      refine mul_nonneg (sub_nonneg.2 (hmono hi')) ?_
+      rw [sum_sub_distrib, hb (by omega) hi'.le, ite_eq_right hi'.ne, sub_zero]
+      exact sub_nonneg.2 (hprefix (by omega) hi')
+    simp only [sum_sub_distrib] at hnonneg
+    linarith only [h, hnonneg]
+  have hbenchmark : ∑ i ∈ range n, b i ^ 2 =
+      2 * (n.choose 3 : ℤ) + (n.choose 2 : ℤ) - 2 * ((n : ℤ) - 2) := by
+    have hchoose : ∑ i ∈ range n, i.choose 2 = n.choose 3 := by
+      rw [← Nat.sub_add_cancel (show 1 ≤ n by omega), ← Nat.sum_Icc_choose]
+      rw [Nat.sub_add_cancel (show 1 ≤ n by omega)]
+      refine (sum_subset (s₁ := Icc 2 (n - 1)) (by
+        intro i hi
+        simp only [mem_Icc, mem_range] at hi ⊢
+        omega) (fun i hi hnot => Nat.choose_eq_zero_of_lt (by
+        simp only [mem_Icc, mem_range] at hi hnot
+        omega))).symm
+    have hbase : ∑ i ∈ range n, (i : ℤ) ^ 2 = 2 * (n.choose 3 : ℤ) + (n.choose 2 : ℤ) := by
+      calc
+        _ = ∑ i ∈ range n, (2 * (i.choose 2 : ℤ) + i) := by
+          refine sum_congr rfl fun i _ => ?_
+          rw [twice_choose_two, sub_add_cancel]
+        _ = _ := by
+          rw [sum_add_distrib, ← mul_sum, ← Nat.cast_sum, hchoose, hid]
+    have hterm (i : ℕ) : b i ^ 2 = (i : ℤ) ^ 2 + (if i = 0 then 1 else 0) -
+        (if i = n - 1 then 2 * (n : ℤ) - 3 else 0) := by
+      by_cases h0 : i = 0
+      · subst i
+        have hlast : 0 ≠ n - 1 := by omega
+        norm_num [b, hlast]
+      by_cases hlast : i = n - 1
+      · subst i
+        simp only [b, h0, ite_false, ite_true, add_zero, Nat.cast_sub (show 1 ≤ n by omega),
+          Nat.cast_one]
+        ring
+      · simp [b, h0, hlast]
+    simp only [hterm, sum_sub_distrib, sum_add_distrib, sum_ite_eq', mem_range, hbase]
+    rw [ite_eq_left (by omega), ite_eq_left (by omega)]
+    ring
+  rw [hsumSq, hbenchmark] at hcomp
+  have h := twice_card_add_sum_sq hT hc
+  exact_mod_cast (show (n : ℤ) ≤ (circularTriadCount T : ℤ) + 2 by linarith only [h, hcomp])
+
+private theorem card_centered_scores (hT : IsTournament T) (hc : 0 < circularTriadCount T)
+    (hn : 3 ≤ n) :
+    24 * (circularTriadCount T : ℤ) = (n : ℤ) ^ 3 - n -
+      3 * ∑ i, (2 * (score T i : ℤ) - ((n : ℤ) - 1)) ^ 2 := by
+  have ht := twice_card_add_sum_sq hT hc
+  have htwo := twice_choose_two n
+  have hthree : 6 * (n.choose 3 : ℤ) = (n : ℤ) * ((n : ℤ) - 1) * ((n : ℤ) - 2) := by
+    have h := congrArg (fun a : ℕ => (a : ℤ)) (Nat.descFactorial_eq_factorial_mul_choose n 3)
+    simp only [Nat.descFactorial_succ, Nat.descFactorial_zero, Nat.sub_zero, mul_one] at h
+    push_cast [Nat.cast_sub (show 1 ≤ n by omega), Nat.cast_sub (show 2 ≤ n by omega)] at h
+    norm_num [Nat.factorial] at h
+    linarith
+  have hsum : (∑ i, (score T i : ℤ)) = (n.choose 2 : ℤ) := by
+    exact_mod_cast sum_score_eq_choose hT
+  have hcenter : (∑ i, (2 * (score T i : ℤ) - ((n : ℤ) - 1)) ^ 2) =
+      4 * (∑ i, (score T i : ℤ) ^ 2) - 4 * ((n : ℤ) - 1) * (n.choose 2 : ℤ) +
+        n * ((n : ℤ) - 1) ^ 2 := by
+    calc
+      _ = ∑ i : Fin n, (4 * (score T i : ℤ) ^ 2 - 4 * ((n : ℤ) - 1) * score T i +
+          ((n : ℤ) - 1) ^ 2) := sum_congr rfl fun i _ => by ring
+      _ = _ := by
+        simp [sum_add_distrib, sum_sub_distrib, ← mul_sum, hsum]
+  rw [hcenter]
+  nlinarith only [ht, htwo, hthree, congrArg (fun x : ℤ => ((n : ℤ) - 1) * x) htwo]
+
+/-- **Theorem 8**: for `d ≥ 1`,
+`A_d(x) = ∑_{k=L(d)}^{d+2} N(k, d) x^k / k!`, where
+`L(d) = min(I_o(d), I_e(d))` with `I_o(d)` (`I_e(d)`) the
+least positive odd (even) integer solution of
+`x³ - x - 24d ≥ 0` (`x³ - 4x - 24d ≥ 0`). Stated as the
+equivalent support condition `N(k, d) ≠ 0 →
+L(d) ≤ k ≤ d + 2`, with `L(d) ≤ k` written as the
+existence of a positive `j ≤ k` solving the odd or the
+even inequality (both cubics increase on the positive
+integers).
+
+Source: Ian R. Harris and Ryan P. A. McShane, "Counting
+Tournaments with a Specified Number of Circular
+Triads", Journal of Integer Sequences 27 (2024), Article 24.8.7, Theorem 8
+(`jis-2024-24.8.7-thm-8`). -/
+theorem atomCount_ne_zero_bounds (d k : ℕ) (hd : 1 ≤ d)
+    (hk : atomCount k d ≠ 0) :
+    k ≤ d + 2 ∧ ∃ j : ℕ, 0 < j ∧ j ≤ k ∧
+      ((Odd j ∧ 24 * (d : ℤ) ≤ (j : ℤ) ^ 3 - j) ∨
+        (Even j ∧ 24 * (d : ℤ) ≤ (j : ℤ) ^ 3 - 4 * j)) := by
+  obtain ⟨T, hT⟩ := Finset.card_pos.1 (Nat.pos_of_ne_zero hk)
+  obtain ⟨hT, hI, -, hcard⟩ := (Finset.mem_filter.1 hT).2
+  have hc : 0 < circularTriadCount T := by omega
+  have hk₃ : 3 ≤ k := by
+    obtain ⟨S, hS⟩ := Finset.card_pos.1 hc
+    have hsize := card_le_univ S
+    rw [Fintype.card_fin, (mem_powersetCard.1 (mem_filter.1 hS).1).2] at hsize
+    exact hsize
+  have hlower := card_le_triads_add_two hT hI hc hk₃
+  refine ⟨hcard ▸ hlower, k, by omega, le_rfl, ?_⟩
+  have hcenter := card_centered_scores hT hc hk₃
+  rw [hcard] at hcenter
+  rcases Nat.even_or_odd k with he | ho
+  · refine Or.inr ⟨he, ?_⟩
+    have hsum : (k : ℤ) ≤ ∑ i, (2 * (score T i : ℤ) - ((k : ℤ) - 1)) ^ 2 := by
+      calc
+        (k : ℤ) = ∑ _ : Fin k, (1 : ℤ) := by simp
+        _ ≤ _ := by
+          refine sum_le_sum fun i _ => ?_
+          let z : ℤ := 2 * (score T i : ℤ) - ((k : ℤ) - 1)
+          change 1 ≤ z ^ 2
+          have hz : z ≠ 0 := by
+            obtain ⟨m, hm⟩ := he
+            dsimp [z]
+            omega
+          exact (Int.add_one_le_iff).2 (sq_pos_of_ne_zero hz)
+    linarith
+  · refine Or.inl ⟨ho, ?_⟩
+    have hsum : 0 ≤ ∑ i, (2 * (score T i : ℤ) - ((k : ℤ) - 1)) ^ 2 :=
+      sum_nonneg fun _ _ => sq_nonneg _
+    linarith
 
 end MathlibExt.GraphTheory.TournamentScoreSequenceWanted
