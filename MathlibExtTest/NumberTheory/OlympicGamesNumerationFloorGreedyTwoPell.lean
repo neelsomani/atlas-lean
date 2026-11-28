@@ -35,11 +35,6 @@ example : pellLucasSequence 2 + pellNumber 2 = pellNumber 3 ∧
 
 example : weight 4 + weight 2 = 2 * weight 3 ∧ weight 5 + weight 3 = 4 * weight 4 := by decide
 
-private theorem sqrt_two_bounds : (1414 : ℝ) / 1000 < Real.sqrt 2 ∧
-    Real.sqrt 2 < (1415 : ℝ) / 1000 :=
-  ⟨(Real.lt_sqrt (by norm_num)).mpr (by norm_num),
-    (Real.sqrt_lt (by norm_num) (by norm_num)).mpr (by norm_num)⟩
-
 private def Check (n : ℕ) (a : ℕ → ℕ) (t u : ℕ) : Prop :=
   (∀ m ≤ n + 1, ∑ k ∈ range m, a k * weight k < weight m) ∧
     (∑ k ∈ range (n + 1), a k * weight k) = t ∧
@@ -58,7 +53,11 @@ example : Check 2 seven 7 11 := by
   · intro m hm
     interval_cases m <;> decide
   · rw [Nat.floor_eq_iff (by positivity)]
-    constructor <;> norm_num <;> linarith only [sqrt_two_bounds.1, sqrt_two_bounds.2]
+    constructor <;> norm_num
+    · have hlo : (8 : ℝ) / 7 ≤ Real.sqrt 2 := Real.le_sqrt_of_sq_le (by norm_num)
+      linarith only [hlo]
+    · have hhi : Real.sqrt 2 < (10 : ℝ) / 7 := (Real.sqrt_lt' (by norm_num)).mpr (by norm_num)
+      linarith only [hhi]
 
 -- Three copies of weight 3 fit below weight 10, but there is no room to add weight 1.
 example : Check 2 (fun k ↦ [0, 0, 3].getD k 0) 9 15 ∧ 9 + weight 0 = weight 3 := by
@@ -66,7 +65,11 @@ example : Check 2 (fun k ↦ [0, 0, 3].getD k 0) 9 15 ∧ 9 + weight 0 = weight 
   · intro m hm
     interval_cases m <;> decide
   · rw [Nat.floor_eq_iff (by positivity)]
-    constructor <;> norm_num <;> linarith only [sqrt_two_bounds.1, sqrt_two_bounds.2]
+    constructor <;> norm_num
+    · have hlo : (4 : ℝ) / 3 ≤ Real.sqrt 2 := Real.le_sqrt_of_sq_le (by norm_num)
+      linarith only [hlo]
+    · have hhi : Real.sqrt 2 < (14 : ℝ) / 9 := (Real.sqrt_lt' (by norm_num)).mpr (by norm_num)
+      linarith only [hhi]
 
 -- Both positive odd digits contribute to the shifted sum.
 example : Check 3 (fun k ↦ [0, 1, 0, 1].getD k 0) 12 20 := by
@@ -74,7 +77,11 @@ example : Check 3 (fun k ↦ [0, 1, 0, 1].getD k 0) 12 20 := by
   · intro m hm
     interval_cases m <;> decide
   · rw [Nat.floor_eq_iff (by positivity)]
-    constructor <;> norm_num <;> linarith only [sqrt_two_bounds.1, sqrt_two_bounds.2]
+    constructor <;> norm_num
+    · have hlo : (4 : ℝ) / 3 ≤ Real.sqrt 2 := Real.le_sqrt_of_sq_le (by norm_num)
+      linarith only [hlo]
+    · have hhi : Real.sqrt 2 < (3 : ℝ) / 2 := (Real.sqrt_lt' (by norm_num)).mpr (by norm_num)
+      linarith only [hhi]
 
 -- Client example: the same sum is allowed with a leading zero.
 example : ⌊(7 : ℝ) * ((2 + Real.sqrt 2) / 2)⌋₊ = 11 := by
