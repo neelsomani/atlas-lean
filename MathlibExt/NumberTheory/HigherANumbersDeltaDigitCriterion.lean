@@ -61,8 +61,8 @@ noncomputable def higherANumberDelta (p d i : ℕ) : ℕ :=
 $\tau = (p + 1)/d = 3/2$, the rounding indicator satisfies $\delta(1) = 1$ and $\delta(2) = 0$.
 
 Source: Booher, Hsieh, Rivera, Tran, Upton, and Wu, *Higher a-Numbers in `ℤ_p`-Towers via
-Counting Lattice Points*, INTEGERS 26 (2026), Article A78, Table 1 (`δ(1) = 1`, `δ(2) = 0` for
-`p = 5`, `d = 4`). -/
+Counting Lattice Points*, INTEGERS 26 (2026), Article A78, Example 5, Table 2
+(`δ(1) = 1`, `δ(2) = 0` for `p = 5`, `d = 4`). -/
 theorem higherANumberDelta_five_four :
     higherANumberDelta 5 4 1 = 1 ∧ higherANumberDelta 5 4 2 = 0 := by
   constructor
@@ -84,6 +84,8 @@ $\tau = (p + 1)/d$. For a rational $t$ and an integer $k$ write $[p^k](t)$ for t
 digit of $t$, the residue of $\lfloor t / p^k \rfloor$ modulo $p$ in
 $\lbrace 0, \dots, p - 1 \rbrace$, and let $\delta$ be the rounding indicator. If $i$ is a natural
 number not divisible by $p$, then $[p^0](\tau i) < [p^{-1}](\tau i)$ if and only if $\delta(i) = 1$.
+
+The paper states Lemma 4 for odd primes; this proof also covers $p = 2$.
 
 Source: Jeremy Booher, Jack Hsieh, Rakesh Rivera, Vincent Tran, James Upton, and Carol Wu,
 *Higher a-Numbers in `ℤ_p`-Towers via Counting Lattice Points*, INTEGERS 26 (2026), Article A78,
