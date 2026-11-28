@@ -21,6 +21,7 @@ public import MathlibExt.NumberTheory.TakagiDNodeSuccessor
 public import MathlibExt.NumberTheory.TakagiDNodeLevelPred
 public import MathlibExt.NumberTheory.TakagiDyadicIdentities
 public import MathlibExt.NumberTheory.TakagiDNodeTreeCount
+public import MathlibExt.NumberTheory.TakagiDyadicMidpoint
 
 /-!
 # Takagi function identities on dyadic rationals
@@ -103,19 +104,6 @@ public theorem_wanted dcDNodes_eq_sum_digit_weight (n : ℕ) (hn : 0 < n) :
         ∑ i ∈ range (Nat.log 2 n),
           2 ^ i * ((n / 2 ^ i % 2 : ℕ) : ℤ) *
             ((Nat.log 2 n : ℤ) - i - 2 * (Nat.digits 2 (n / 2 ^ i)).sum + 4)
-
-/-- **Midpoint recurrence for the Takagi function at dyadic rationals.** Let $k$ and $r$ be
-natural numbers with $1 \le r < 2^k$. For a natural number $m$, write $\tau(m / 2^k)$ for the
-Takagi value of the dyadic presentation $m / 2^k$, and let $\rho_1$ be the $2$-adic valuation of
-$r$, the position (counted from $0$) of the lowest nonzero binary digit of $r$. Then
-$\tau(r / 2^k) = (\tau((r - 1) / 2^k) + \tau((r + 1) / 2^k))/2 + (1 - \rho_1)/2^k$.
-
-Source: Laura Monroe, *Takagi Function Identities on Dyadic Rationals*, Journal of Integer
-Sequences 27 (2024), Article 24.2.7, Theorem 24 (`jis-2024-24.2.7-thm-24`). -/
-public theorem_wanted takagi_dyadic_eq_midpoint_add (k r : ℕ) (hr0 : 1 ≤ r) (hr : r < 2 ^ k) :
-    takagiNewdef r ((k : ℤ) - 1) =
-      (takagiNewdef (r - 1) ((k : ℤ) - 1) + takagiNewdef (r + 1) ((k : ℤ) - 1)) / 2 +
-        (1 - (padicValNat 2 r : ℝ)) / 2 ^ k
 
 /-- **Takagi values at dyadic rationals from level $D$-node counts.** Let $k$ and $r$ be
 natural numbers with $r < 2^k$ and put $n = 2^k + r$. Write $\tau(r, k-1)$ for the Takagi value
