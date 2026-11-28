@@ -463,17 +463,39 @@ private theorem recover_height {n k : ℕ} {p : Word n} {i j : Fin n} (hk : 1 �
   · rw [image_height hk hp hh _ (by have := j.isLt; omega)]
     simpa only [ite_eq_right hmi, ite_eq_right hmj] using e
 
+private theorem hump_exists_mk {n : ℕ} (q : MotzkinHumpFamily n) :
+    ∃ (k : ℕ) (p : Word n) (i j : Fin n) (hk : 1 ≤ k) (hkn : k ≤ n / 2)
+      (hp : IsMotzkinPrefix n 0 p) (hh : IsMotzkinHump n k p i j),
+      q = MotzkinHumpFamily.mk (k, p, i, j) ⟨hk, hkn, hp, hh⟩ := by
+  generalize hq : q.coordinates = v
+  obtain ⟨k, p, i, j⟩ := v
+  obtain ⟨hk, hkn, hp, hh⟩ :=
+    (MotzkinHumpFamily.mem_range_coordinates_iff (k, p, i, j)).mp ⟨q, hq⟩
+  refine ⟨k, p, i, j, hk, hkn, hp, hh, MotzkinHumpFamily.coordinates_injective ?_⟩
+  simpa only [MotzkinHumpFamily.coordinates_mk] using hq
+
 private def toLast (n : ℕ) (q : MotzkinHumpFamily n) : MotzkinLastUpEvenFamily n := by
-  rcases q with ⟨⟨k, p, i, j⟩, hk, hkn, hp, hh⟩
-  exact ⟨⟨k, image hk hp hh⟩, hk, hkn, prefix_wordOf (imageWalk hk hp hh),
-    (image_cut hk hp hh).last.isLast⟩
+  have hq := (MotzkinHumpFamily.mem_range_coordinates_iff q.coordinates).mp ⟨q, rfl⟩
+  let p := image hq.1 hq.2.2.1 hq.2.2.2
+  exact MotzkinLastUpEvenFamily.mk (q.coordinates.1, p)
+    ⟨hq.1, hq.2.1, prefix_wordOf (imageWalk hq.1 hq.2.2.1 hq.2.2.2),
+      (image_cut hq.1 hq.2.2.1 hq.2.2.2).last.isLast⟩
+
+private theorem toLast_mk_coordinates {n k : ℕ} {p : Word n} {i j : Fin n}
+    (hk : 1 ≤ k) (hkn : k ≤ n / 2) (hp : IsMotzkinPrefix n 0 p)
+    (hh : IsMotzkinHump n k p i j) :
+    (toLast n (MotzkinHumpFamily.mk (k, p, i, j) ⟨hk, hkn, hp, hh⟩)).coordinates =
+      (k, image hk hp hh) := by
+  simp only [toLast, MotzkinLastUpEvenFamily.coordinates_mk, MotzkinHumpFamily.coordinates_mk]
 
 private theorem toLast_injective (n : ℕ) : Function.Injective (toLast n) := by
-  rintro ⟨⟨k, p, i, j⟩, hk, hkn, hp, hh⟩ ⟨⟨k', p', i', j'⟩, hk', hkn', hp', hh'⟩ e
-  have ek : k = k' := congrArg (fun q : MotzkinLastUpEvenFamily n => q.val.1) e
+  intro q q' e
+  obtain ⟨k, p, i, j, hk, hkn, hp, hh, rfl⟩ := hump_exists_mk q
+  obtain ⟨k', p', i', j', hk', hkn', hp', hh', rfl⟩ := hump_exists_mk q'
+  have ec := congrArg MotzkinLastUpEvenFamily.coordinates e
+  rw [toLast_mk_coordinates hk hkn hp hh, toLast_mk_coordinates hk' hkn' hp' hh'] at ec
+  obtain ⟨ek, ep⟩ := Prod.mk.inj ec
   subst k'
-  have ep : image hk hp hh = image hk' hp' hh' :=
-    congrArg (fun q : MotzkinLastUpEvenFamily n => q.val.2) e
   have c := image_cut hk hp hh
   have c' := image_cut hk' hp' hh'
   rw [← ep] at c'
@@ -498,7 +520,11 @@ private theorem toLast_injective (n : ℕ) : Function.Injective (toLast n) := by
   rfl
 
 private theorem toLast_surjective (n : ℕ) : Function.Surjective (toLast n) := by
-  rintro ⟨⟨k, p⟩, hk, hkn, hp, hl⟩
+  intro q
+  generalize hq : q.coordinates = v
+  obtain ⟨k, p⟩ := v
+  obtain ⟨hk, hkn, hp, hl⟩ :=
+    (MotzkinLastUpEvenFamily.mem_range_coordinates_iff (k, p)).mp ⟨q, hq⟩
   obtain ⟨t, l⟩ := last_of_word hp hl
   obtain ⟨i, c⟩ := cut_exists (by exact_mod_cast hk) (walk_height hp) l
   let j := i + (n - t)
@@ -508,8 +534,10 @@ private theorem toLast_surjective (n : ℕ) : Function.Surjective (toLast n) := 
   let j' : Fin n := ⟨j, h.bound⟩
   have hh : IsMotzkinHump n k (wordOf w) i' j' :=
     hump_iff.mpr (h.of_heights (height_wordOf w))
-  refine ⟨⟨⟨k, wordOf w, i', j'⟩, hk, hkn, prefix_wordOf w, hh⟩, Subtype.ext (Prod.ext rfl ?_)⟩
-  change image hk (prefix_wordOf w) hh = p
+  refine ⟨MotzkinHumpFamily.mk (k, wordOf w, i', j') ⟨hk, hkn, prefix_wordOf w, hh⟩,
+    MotzkinLastUpEvenFamily.coordinates_injective ?_⟩
+  rw [toLast_mk_coordinates hk hkn (prefix_wordOf w) hh, hq]
+  refine Prod.ext rfl ?_
   apply word_ext
   intro m hm
   rw [image_height hk (prefix_wordOf w) hh m hm]
@@ -551,11 +579,16 @@ public theorem motzkinHumpFamily_equiv_lastUpEvenFamily (n : ℕ) :
         ∀ q, IsMotzkinPeak n q.val.1 q.val.2.1 q.val.2.2.1 q.val.2.2.2 ↔
           EndsWithUp n (e q).val.2 := by
   let e := Equiv.ofBijective (toLast n) ⟨toLast_injective n, toLast_surjective n⟩
+  have he (q : MotzkinHumpFamily n) : e q = toLast n q := rfl
   refine ⟨e, ?_, ?_⟩
-  · rintro ⟨⟨k, p, i, j⟩, hk, hkn, hp, hh⟩
-    rfl
-  · rintro ⟨⟨k, p, i, j⟩, hk, hkn, hp, hh⟩
-    change IsMotzkinPeak n k p i j ↔ EndsWithUp n (image hk hp hh)
+  · intro q
+    obtain ⟨k, p, i, j, hk, hkn, hp, hh, rfl⟩ := hump_exists_mk q
+    rw [he, MotzkinLastUpEvenFamily.val_eq_coordinates, MotzkinHumpFamily.val_eq_coordinates,
+      toLast_mk_coordinates hk hkn hp hh, MotzkinHumpFamily.coordinates_mk]
+  · intro q
+    obtain ⟨k, p, i, j, hk, hkn, hp, hh, rfl⟩ := hump_exists_mk q
+    rw [he, MotzkinLastUpEvenFamily.val_eq_coordinates, MotzkinHumpFamily.val_eq_coordinates,
+      toLast_mk_coordinates hk hkn hp hh, MotzkinHumpFamily.coordinates_mk]
     rw [isMotzkinPeak_iff, and_iff_right hh, (image_cut hk hp hh).last.ends_iff]
     have hij := (hump_iff.mp hh).lt
     have hjn := j.isLt

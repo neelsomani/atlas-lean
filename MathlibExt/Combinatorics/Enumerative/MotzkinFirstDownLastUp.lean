@@ -266,34 +266,46 @@ private theorem counts_eq (n : ℕ) : firstDown n 0 = lastUp n := by
 -- In either indexed family the word determines the index from its final height.
 private def firstEquiv (n : ℕ) : MotzkinFirstDownFamily n ≃
     {p : Word n // Good 0 p ∧ FirstNonupStepDown n p} where
-  toFun := fun ⟨⟨k, p⟩, _, hp, hf⟩ => ⟨p, ((prefix_iff p k).mp hp).1, hf⟩
-  invFun := fun ⟨p, hg, hf⟩ => ⟨⟨(motzkinPrefixHeight p n).toNat, p⟩, by
+  toFun q :=
+    let hq := (MotzkinFirstDownFamily.mem_range_coordinates_iff q.coordinates).mp ⟨q, rfl⟩
+    ⟨q.coordinates.2, ((prefix_iff _ _).mp hq.2.1).1, hq.2.2⟩
+  invFun := fun ⟨p, hg, hf⟩ => MotzkinFirstDownFamily.mk ((motzkinPrefixHeight p n).toNat, p) (by
     have := nonneg_end hg
     have := height_first p hf
-    exact ⟨by omega, (prefix_iff p _).mpr ⟨hg, by omega⟩, hf⟩⟩
-  left_inv := by
-    rintro ⟨⟨k, p⟩, _, hp, _⟩
-    apply Subtype.ext
+    exact ⟨by omega, (prefix_iff p _).mpr ⟨hg, by omega⟩, hf⟩)
+  left_inv q := by
+    have hq := (MotzkinFirstDownFamily.mem_range_coordinates_iff q.coordinates).mp ⟨q, rfl⟩
+    apply MotzkinFirstDownFamily.coordinates_injective
+    simp only [MotzkinFirstDownFamily.coordinates_mk]
     refine Prod.ext ?_ rfl
-    change (motzkinPrefixHeight p n).toNat = k
-    rw [((prefix_iff p k).mp hp).2, Int.toNat_natCast]
-  right_inv _ := rfl
+    change (motzkinPrefixHeight q.coordinates.2 n).toNat = q.coordinates.1
+    rw [((prefix_iff _ _).mp hq.2.1).2, Int.toNat_natCast]
+  right_inv q := by
+    apply Subtype.ext
+    simp only [MotzkinFirstDownFamily.coordinates_mk]
 
 private def lastEquiv (n : ℕ) : MotzkinLastUpEvenFamily n ≃ {p : Word n // LastUp p} where
-  toFun := fun ⟨⟨k, p⟩, hk, _, hp, hu⟩ => ⟨p, by
-    obtain ⟨hg, he⟩ := (prefix_iff p _).mp hp
-    exact ⟨⟨hg, by omega⟩, by omega, hu⟩⟩
-  invFun := fun ⟨p, ⟨hg, he⟩, hpos, hu⟩ => ⟨⟨(motzkinPrefixHeight p n).toNat / 2, p⟩, by
-    have := height_le p
-    exact ⟨by omega, by omega, (prefix_iff p _).mpr ⟨hg, by omega⟩, hu⟩⟩
-  left_inv := by
-    rintro ⟨⟨k, p⟩, _, _, hp, _⟩
-    apply Subtype.ext
+  toFun q :=
+    let hq := (MotzkinLastUpEvenFamily.mem_range_coordinates_iff q.coordinates).mp ⟨q, rfl⟩
+    ⟨q.coordinates.2, by
+      obtain ⟨hg, he⟩ := (prefix_iff _ _).mp hq.2.2.1
+      have hk := hq.1
+      exact ⟨⟨hg, by omega⟩, by omega, hq.2.2.2⟩⟩
+  invFun := fun ⟨p, ⟨hg, he⟩, hpos, hu⟩ =>
+    MotzkinLastUpEvenFamily.mk ((motzkinPrefixHeight p n).toNat / 2, p) (by
+      have := height_le p
+      exact ⟨by omega, by omega, (prefix_iff p _).mpr ⟨hg, by omega⟩, hu⟩)
+  left_inv q := by
+    have hq := (MotzkinLastUpEvenFamily.mem_range_coordinates_iff q.coordinates).mp ⟨q, rfl⟩
+    apply MotzkinLastUpEvenFamily.coordinates_injective
+    simp only [MotzkinLastUpEvenFamily.coordinates_mk]
     refine Prod.ext ?_ rfl
-    change (motzkinPrefixHeight p n).toNat / 2 = k
-    have he : motzkinPrefixHeight p n = 2 * (k : ℤ) := ((prefix_iff p _).mp hp).2
+    change (motzkinPrefixHeight q.coordinates.2 n).toNat / 2 = q.coordinates.1
+    have he := ((prefix_iff _ _).mp hq.2.2.1).2
     omega
-  right_inv _ := rfl
+  right_inv q := by
+    apply Subtype.ext
+    simp only [MotzkinLastUpEvenFamily.coordinates_mk]
 
 private theorem card_words {n : ℕ} (P : Word n → Prop) [Fintype {p // P p}] :
     Fintype.card {p // P p} = count P := by

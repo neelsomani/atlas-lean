@@ -361,6 +361,51 @@ public def MotzkinHumpFamily (n : ℕ) :=
     1 ≤ q.1 ∧ q.1 ≤ n / 2 ∧ IsMotzkinPrefix n 0 q.2.1 ∧
       IsMotzkinHump n q.1 q.2.1 q.2.2.1 q.2.2.2}
 
+namespace MotzkinHumpFamily
+
+/-- **Construct a marked hump.** Package coordinates together with proofs of
+the family conditions. -/
+public def mk {n : ℕ} (x : ℕ × ((Fin n → Fin 3) × Fin n × Fin n))
+    (hx : 1 ≤ x.1 ∧ x.1 ≤ n / 2 ∧ IsMotzkinPrefix n 0 x.2.1 ∧
+      IsMotzkinHump n x.1 x.2.1 x.2.2.1 x.2.2.2) : MotzkinHumpFamily n :=
+  ⟨x, hx⟩
+
+/-- **Coordinates of a marked hump.** Read the height label, path, and marked up and down
+positions. -/
+public def coordinates {n : ℕ} (q : MotzkinHumpFamily n) : ℕ × ((Fin n → Fin 3) × Fin n × Fin n) :=
+  q.val
+
+/-- **Coordinates of a constructed marked hump.** Reading the coordinates of a
+constructed family element recovers the supplied data. -/
+@[simp] public theorem coordinates_mk {n : ℕ} (x : ℕ × ((Fin n → Fin 3) × Fin n × Fin n))
+    (hx : 1 ≤ x.1 ∧ x.1 ≤ n / 2 ∧ IsMotzkinPrefix n 0 x.2.1 ∧
+      IsMotzkinHump n x.1 x.2.1 x.2.2.1 x.2.2.2) : (mk x hx).coordinates = x := rfl
+
+/-- **Membership in the marked hump family.** A tuple occurs as the coordinates
+of a family element exactly when it satisfies
+the height bounds, the path condition and the marked-hump condition. -/
+public theorem mem_range_coordinates_iff {n : ℕ} (x : ℕ × ((Fin n → Fin 3) × Fin n × Fin n)) :
+    x ∈ Set.range (@coordinates n) ↔
+      1 ≤ x.1 ∧ x.1 ≤ n / 2 ∧ IsMotzkinPrefix n 0 x.2.1 ∧
+        IsMotzkinHump n x.1 x.2.1 x.2.2.1 x.2.2.2 := by
+  constructor
+  · rintro ⟨q, rfl⟩
+    exact q.property
+  · intro hx
+    exact ⟨mk x hx, coordinates_mk x hx⟩
+
+/-- **Coordinates determine a marked hump.** Two elements with the same
+coordinates are equal, regardless of their membership proofs. -/
+public theorem coordinates_injective {n : ℕ} : Function.Injective (@coordinates n) :=
+  Subtype.val_injective
+
+/-- **Subtype value of a marked hump.** The subtype value used by statements
+about this family equals the tuple given by the coordinate accessor. -/
+public theorem val_eq_coordinates {n : ℕ} (q : MotzkinHumpFamily n) :
+    q.val = q.coordinates := rfl
+
+end MotzkinHumpFamily
+
 /-- **Motzkin prefixes of even height whose last non-flat step is up.** Use the steps
 $U = (1,1)$, $F = (1,0)$ and $D = (1,-1)$, and call a word in these steps a Motzkin prefix if
 none of its initial segments ends below height $0$. For a natural number $n$, this is the set
@@ -380,6 +425,50 @@ public def MotzkinLastUpEvenFamily (n : ℕ) :=
     1 ≤ q.1 ∧ q.1 ≤ n / 2 ∧ IsMotzkinPrefix n (2 * q.1) q.2 ∧
       LastNonflatStepUp n q.2}
 
+namespace MotzkinLastUpEvenFamily
+
+/-- **Construct an even-height last-up prefix.** Package coordinates together with proofs of
+the family conditions. -/
+public def mk {n : ℕ} (x : ℕ × (Fin n → Fin 3))
+    (hx : 1 ≤ x.1 ∧ x.1 ≤ n / 2 ∧ IsMotzkinPrefix n (2 * x.1) x.2 ∧
+      LastNonflatStepUp n x.2) : MotzkinLastUpEvenFamily n :=
+  ⟨x, hx⟩
+
+/-- **Coordinates of an even-height last-up prefix.** Read the half-height label and prefix word. -/
+public def coordinates {n : ℕ} (q : MotzkinLastUpEvenFamily n) : ℕ × (Fin n → Fin 3) :=
+  q.val
+
+/-- **Coordinates of a constructed even-height last-up prefix.** Reading the coordinates of a
+constructed family element recovers the supplied data. -/
+@[simp] public theorem coordinates_mk {n : ℕ} (x : ℕ × (Fin n → Fin 3))
+    (hx : 1 ≤ x.1 ∧ x.1 ≤ n / 2 ∧ IsMotzkinPrefix n (2 * x.1) x.2 ∧
+      LastNonflatStepUp n x.2) : (mk x hx).coordinates = x := rfl
+
+/-- **Membership in the even-height last-up prefix family.** A tuple occurs as the coordinates
+of a family element exactly when it satisfies
+the label bounds, the even-height prefix condition and the last-up condition. -/
+public theorem mem_range_coordinates_iff {n : ℕ} (x : ℕ × (Fin n → Fin 3)) :
+    x ∈ Set.range (@coordinates n) ↔
+      1 ≤ x.1 ∧ x.1 ≤ n / 2 ∧ IsMotzkinPrefix n (2 * x.1) x.2 ∧
+        LastNonflatStepUp n x.2 := by
+  constructor
+  · rintro ⟨q, rfl⟩
+    exact q.property
+  · intro hx
+    exact ⟨mk x hx, coordinates_mk x hx⟩
+
+/-- **Coordinates determine an even-height last-up prefix.** Two elements with the same
+coordinates are equal, regardless of their membership proofs. -/
+public theorem coordinates_injective {n : ℕ} : Function.Injective (@coordinates n) :=
+  Subtype.val_injective
+
+/-- **Subtype value of an even-height last-up prefix.** The subtype value used by statements
+about this family equals the tuple given by the coordinate accessor. -/
+public theorem val_eq_coordinates {n : ℕ} (q : MotzkinLastUpEvenFamily n) :
+    q.val = q.coordinates := rfl
+
+end MotzkinLastUpEvenFamily
+
 /-- **Motzkin prefixes whose first non-up step is down.** Use the steps $U = (1,1)$,
 $F = (1,0)$ and $D = (1,-1)$, and call a word in these steps a Motzkin prefix if none of its
 initial segments ends below height $0$. For a natural number $n$, this is the set of pairs
@@ -395,6 +484,44 @@ Source: Xiaomei Chen, *Humps in Motzkin Paths and Standard Young Tableaux in a (
 public def MotzkinFirstDownFamily (n : ℕ) :=
   {q : ℕ × (Fin n → Fin 3) //
     q.1 + 2 ≤ n ∧ IsMotzkinPrefix n q.1 q.2 ∧ FirstNonupStepDown n q.2}
+
+namespace MotzkinFirstDownFamily
+
+/-- **Construct a first-down prefix.** Package coordinates together with proofs of
+the family conditions. -/
+public def mk {n : ℕ} (x : ℕ × (Fin n → Fin 3))
+    (hx : x.1 + 2 ≤ n ∧ IsMotzkinPrefix n x.1 x.2 ∧ FirstNonupStepDown n x.2) :
+    MotzkinFirstDownFamily n :=
+  ⟨x, hx⟩
+
+/-- **Coordinates of a first-down prefix.** Read the height label and prefix word. -/
+public def coordinates {n : ℕ} (q : MotzkinFirstDownFamily n) : ℕ × (Fin n → Fin 3) :=
+  q.val
+
+/-- **Coordinates of a constructed first-down prefix.** Reading the coordinates of a
+constructed family element recovers the supplied data. -/
+@[simp] public theorem coordinates_mk {n : ℕ} (x : ℕ × (Fin n → Fin 3))
+    (hx : x.1 + 2 ≤ n ∧ IsMotzkinPrefix n x.1 x.2 ∧ FirstNonupStepDown n x.2) :
+    (mk x hx).coordinates = x := rfl
+
+/-- **Membership in the first-down prefix family.** A tuple occurs as the coordinates
+of a family element exactly when it satisfies
+the label bound, the prefix condition and the first-down condition. -/
+public theorem mem_range_coordinates_iff {n : ℕ} (x : ℕ × (Fin n → Fin 3)) :
+    x ∈ Set.range (@coordinates n) ↔
+      x.1 + 2 ≤ n ∧ IsMotzkinPrefix n x.1 x.2 ∧ FirstNonupStepDown n x.2 := by
+  constructor
+  · rintro ⟨q, rfl⟩
+    exact q.property
+  · intro hx
+    exact ⟨mk x hx, coordinates_mk x hx⟩
+
+/-- **Coordinates determine a first-down prefix.** Two elements with the same
+coordinates are equal, regardless of their membership proofs. -/
+public theorem coordinates_injective {n : ℕ} : Function.Injective (@coordinates n) :=
+  Subtype.val_injective
+
+end MotzkinFirstDownFamily
 
 /-- **Hook tableaux of order 3 with row difference 1.** The number $\mathrm{SYT}_1(2,1;3)$ of
 standard Young tableaux of order $3$ in the $(2,1)$-hook whose first row is longer than its
