@@ -18,6 +18,7 @@ public import Mathlib.Data.Fin.VecNotation
 public import Mathlib.Data.Multiset.Powerset
 public import Mathlib.Order.Interval.Finset.Nat
 public import MathlibExt.Combinatorics.Enumerative.AscentToDescentRearrangement
+public import MathlibExt.Combinatorics.Enumerative.ParkingFunctionLastEntry
 public import MathlibExt.Combinatorics.Enumerative.ParkingFunctionStatistics
 public import MathlibExt.Combinatorics.FineNumber
 
@@ -42,8 +43,6 @@ the imported rearrangement `ascentToDescentRearrangement` is its `ν`.
 namespace MetaMathlibExt
 
 @[expose] public section
-
-open Classical
 
 set_option quotPrecheck false in
 /-- The parking functions of length `n`. -/
@@ -189,24 +188,6 @@ Functions*, Journal of Integer Sequences 27 (2024), Article 24.8.6, Corollary 31
 (`jis-2024-24.8.6-cor-31`). -/
 public theorem_wanted card_peakless_tieless_parkingFunction (n : ℕ) (hn : 1 ≤ n) :
     (ptpfSet n).card = catalan n
-
-/-- **Peakless-tieless parking functions by last entry.** Write a parking function $f$ of length
-$n$ as the sequence $(a_1, \dots, a_n)$ with $a_j = f(j-1) + 1 \in \{1, \dots, n\}$. It is
-peakless-tieless if there is no $j$ with $a_{j-1} < a_j > a_{j+1}$ (a peak) and no $j$ with
-$a_j = a_{j+1}$ (a tie). For natural numbers $i$ and $n$ with $1 \le i \le n$, the number of
-peakless-tieless parking functions of length $n$ with last entry $a_n = i$ is
-$$\binom{n+i-2}{i-1} \cdot \frac{n-i+1}{n}.$$
-
-This is the Catalan-triangle entry $T(n-1, i-1)$ of OEIS A009766.
-
-Source: Ari Cruz, Pamela E. Harris, Kimberly J. Harry, Jan Kretschmann, Matt McClinton,
-Alex Moon, John O. Museus and Eric Redmon, *On Some Discrete Statistics of Parking
-Functions*, Journal of Integer Sequences 27 (2024), Article 24.8.6, Corollary 32
-(`jis-2024-24.8.6-cor-32`). -/
-public theorem_wanted card_peakless_tieless_parkingFunction_last (n i : ℕ) (hi : 1 ≤ i)
-    (hin : i ≤ n) :
-    ((((ptpfSet n).filter (fun f => ∀ j : Fin n, j.val + 1 = n → (f j : ℕ) + 1 = i)).card :
-      ℕ) : ℚ) = ((n + i - 2).choose (i - 1) : ℚ) * ((n - i + 1 : ℕ) : ℚ) / n
 
 /-- **Valleyless-tieless parking functions are counted by the Fine numbers.** Write a parking
 function $f$ of length $n$ as the sequence $(a_1, \dots, a_n)$ with $a_j = f(j-1) + 1$. It is
