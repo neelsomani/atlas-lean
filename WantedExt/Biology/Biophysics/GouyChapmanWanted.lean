@@ -44,6 +44,7 @@ public import Mathlib.Analysis.SpecialFunctions.Trigonometric.DerivHyp
 public import Mathlib.Analysis.SpecialFunctions.Log.Basic
 public import Mathlib.Analysis.SpecialFunctions.Sqrt
 public import Mathlib.Analysis.SpecialFunctions.Pow.Real
+public import Domains.Biology.Biophysics.GouyChapman
 
 @[expose] public section
 
@@ -111,22 +112,6 @@ public theorem_wanted surface_potential_identities :
     (∀ Φ₀ : ℝ, Real.exp (-Φ₀ / 2) = (1 - Real.tanh (Φ₀ / 4)) / (1 + Real.tanh (Φ₀ / 4))) ∧
       ∀ g : ℝ, 0 < g → (1 - g) / (1 + g) = -Real.tanh (Real.log g / 2)
 
-/-- The **Bjerrum length** `ℓ_B = e² / (4π ε k_B T)` (supplied SI convention). -/
-noncomputable def bjerrum (e ε kB T : ℝ) : ℝ :=
-  e ^ 2 / (4 * Real.pi * ε * kB * T)
-
-/-- The **Debye length** `λ_D = √(ε k_B T / (2 e² C₀))` of a `1:1` electrolyte. -/
-noncomputable def debye (e ε kB T C₀ : ℝ) : ℝ :=
-  Real.sqrt (ε * kB * T / (2 * e ^ 2 * C₀))
-
-/-- The reduced surface charge `h = 4π ℓ_B σ λ_D / e`. -/
-noncomputable def reducedCharge (e ε kB T C₀ σ : ℝ) : ℝ :=
-  4 * Real.pi * bjerrum e ε kB T * σ * debye e ε kB T C₀ / e
-
-/-- `a = x₀ / λ_D` with `x₀ = e / (2π ℓ_B σ)`. -/
-noncomputable def chargeRatio (e ε kB T C₀ σ : ℝ) : ℝ :=
-  e / (2 * Real.pi * bjerrum e ε kB T * σ) / debye e ε kB T C₀
-
 /-- **Reduction to the dimensionless equation** (Tokmakoff, Section 6.7): for `e, ε, k_B, T, C₀ > 0`
 and `λ = λ_D`, if on `[0, ∞)` `ψ` has within-derivative `ψ'` and `ψ'` has within-derivative
 `(2 e C₀ / ε) sinh(e ψ(x) / (k_B T))`, then on `[0, ∞)` the rescaled potential
@@ -159,19 +144,6 @@ public theorem_wanted g_eq_printed_of_pos (e ε kB T C₀ σ : ℝ) (he : 0 < e)
     reducedCharge e ε kB T C₀ σ / (2 + Real.sqrt (4 + reducedCharge e ε kB T C₀ σ ^ 2)) =
         -chargeRatio e ε kB T C₀ σ + Real.sqrt (1 + chargeRatio e ε kB T C₀ σ ^ 2) ∧
       -chargeRatio e ε kB T C₀ σ + Real.sqrt (1 + chargeRatio e ε kB T C₀ σ ^ 2) ∈ Ioo 0 1
-
-/-- **The corrected branch for negative charge** (Tokmakoff, Section 6.7, corrected): for
-`e, ε, k_B, T, C₀ > 0` and `σ < 0`, with `h` and `a = x₀ / λ_D < 0` as above, the printed value
-`-a + √(1 + a²)` exceeds `1`, while `h / (2 + √(4 + h²)) = -a - √(1 + a²)`, which lies in
-`(-1, 0)`.
-
-Source: Tokmakoff, Section 6.7. -/
-public theorem_wanted g_eq_corrected_of_neg (e ε kB T C₀ σ : ℝ) (he : 0 < e) (hε : 0 < ε)
-    (hkB : 0 < kB) (hT : 0 < T) (hC : 0 < C₀) (hσ : σ < 0) :
-    1 < -chargeRatio e ε kB T C₀ σ + Real.sqrt (1 + chargeRatio e ε kB T C₀ σ ^ 2) ∧
-      reducedCharge e ε kB T C₀ σ / (2 + Real.sqrt (4 + reducedCharge e ε kB T C₀ σ ^ 2)) =
-        -chargeRatio e ε kB T C₀ σ - Real.sqrt (1 + chargeRatio e ε kB T C₀ σ ^ 2) ∧
-      -chargeRatio e ε kB T C₀ σ - Real.sqrt (1 + chargeRatio e ε kB T C₀ σ ^ 2) ∈ Ioo (-1) 0
 
 /-- **The uncharged surface** (Tokmakoff, Section 6.7): for any `e, ε, k_B, T, C₀` and `σ = 0`,
 `h = 0`, hence `g = h / (2 + √(4 + h²)) = 0` and the profile `gcProfile 0` vanishes identically.
